@@ -2023,11 +2023,28 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 			return cfg;
 		}
 
-		if (siteCps.isEmpty()) {
+		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(cpId);
+		if (siteCps.isEmpty() && primarySiteCps.isEmpty()) {
 			throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
 		}
 
-		cfg.setRestriction(getListRestriction(siteCps));
+		String restrictions = "";
+		if (!siteCps.isEmpty()) {
+			restrictions = getListRestriction(siteCps);
+		}
+
+		if (!primarySiteCps.isEmpty()) {
+			//
+			// TODO: remove primary specimen site CPs that are in siteCps as well
+			//
+			if (!siteCps.isEmpty()) {
+				restrictions += " or ";
+			}
+
+			restrictions += "(Specimen.lineage = \"New\" and " + getListRestriction(primarySiteCps) + ")";
+		}
+
+		cfg.setRestriction(restrictions);
 		cfg.setDistinct(true);
 		return cfg;
 	}

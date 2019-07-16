@@ -35,6 +35,7 @@ angular.module('os.biospecimen.participant',
           $scope.partRegOpts =        {cp: cp.shortTitle, sites: sites, resource: 'ParticipantPhi', operations: ['Create']};
           $scope.orderCreateOpts =    {cp: cp.shortTitle, sites: sites, resource: 'Order', operations: ['Create']};
           $scope.shipmentCreateOpts = {cp: cp.shortTitle, sites: sites, resource: 'ShippingAndTracking', operations: ['Create']};
+          $scope.specimenReadOpts   = {cp: cp.shortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Read']};
           $scope.specimenUpdateOpts = {cp: cp.shortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Update']};
           $scope.specimenDeleteOpts = {cp: cp.shortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Delete']};
           $scope.cpReadOpts         = {resource: 'CollectionProtocol', operations: ['Read']};
@@ -44,7 +45,7 @@ angular.module('os.biospecimen.participant',
             return CollectionProtocol.getById($stateParams.cpId);
           },
 
-          cpViewCtx: function(cp, currentUser, AuthorizationService) {
+          cpViewCtx: function(cp, currentUser, authInit, AuthorizationService) {
             var participantEximAllowed = AuthorizationService.isAllowed({
               resource: 'ParticipantPhi',
               operations: ['Export Import'],
@@ -57,11 +58,19 @@ angular.module('os.biospecimen.participant',
               cp: cp.shortTitle
             });
 
+            var spmnReadAllowed = AuthorizationService.isAllowed({
+              resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
+              operations: ['Read'],
+              cp: cp.shortTitle,
+              sites: cp.cpSites.map(function(cpSite) { return cpSite.siteName; })
+            });
+
             return {
               participantImportAllowed: participantEximAllowed,
               visitSpecimenImportAllowed: visitSpmnEximAllowed,
               participantExportAllowed: participantEximAllowed,
-              visitSpecimenExportAllowed: visitSpmnEximAllowed
+              visitSpecimenExportAllowed: visitSpmnEximAllowed,
+              spmnReadAllowed: spmnReadAllowed
             }
           },
 
@@ -161,8 +170,12 @@ angular.module('os.biospecimen.participant',
             return SettingUtil.getSetting('biospecimen', 'cp_sop_doc_url');
           },
 
-          spmnListCfg: function(cp, CpConfigSvc) {
-            return CpConfigSvc.getListConfig(cp, 'specimen-list-view');
+          spmnListCfg: function(cp, cpViewCtx, CpConfigSvc) {
+            if (cpViewCtx.spmnReadAllowed) {
+              return CpConfigSvc.getListConfig(cp, 'specimen-list-view');
+            } else {
+              return null;
+            }
           }
         },
         parent: 'cp-view',
@@ -185,6 +198,15 @@ angular.module('os.biospecimen.participant',
         templateUrl: 'modules/biospecimen/participant/specimens-list.html',
         controller: 'SpecimensListViewCtrl',
         resolve: {
+          accessAllowed: function(cp, cpViewCtx, Alerts) {
+            if (!cpViewCtx.spmnReadAllowed) {
+              Alerts.error('specimens.no_read_access', {cp: cp});
+              throw "Access to specimens of the CP: " + cp.shortTitle + " not allowed!";
+            }
+
+            return null;
+          },
+
           sdeConfigured: function($injector, cp, CpConfigSvc) {
             if (!$injector.has('sdeFieldsSvc')) {
               return false;
@@ -506,8 +528,8 @@ angular.module('os.biospecimen.participant',
         url: '/detail',
         templateUrl: 'modules/biospecimen/participant/detail.html',
         resolve: {
-          visits: function($stateParams, Visit) {
-            return Visit.listFor($stateParams.cprId, true);
+          visits: function($stateParams, cpViewCtx, Visit) {
+            return cpViewCtx.spmnReadAllowed ? Visit.listFor($stateParams.cprId, true) : null;
           }
         },
         controller: 'ParticipantDetailCtrl',
