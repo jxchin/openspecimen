@@ -15,6 +15,8 @@ public class SpecimenListCriteria extends AbstractListCriteria<SpecimenListCrite
 	private String[] collectionStatuses;
 
 	private List<SiteCpPair> siteCps;
+
+	private List<SiteCpPair> primarySpmnSiteCps;
 	
 	private List<String> labels;
 
@@ -93,7 +95,16 @@ public class SpecimenListCriteria extends AbstractListCriteria<SpecimenListCrite
 		this.siteCps = siteCps;
 		return self();
 	}
-	
+
+	public List<SiteCpPair> primarySpmnSiteCps() {
+		return primarySpmnSiteCps;
+	}
+
+	public SpecimenListCriteria primarySpmnSiteCps(List<SiteCpPair> siteCps) {
+		this.primarySpmnSiteCps = siteCps;
+		return self();
+	}
+
 	public List<String> labels() {
 		return labels;
 	}

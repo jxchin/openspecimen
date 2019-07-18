@@ -1,7 +1,8 @@
 angular.module('os.biospecimen.specimen')
   .directive('osSpecimenOps', function(
     $state, $rootScope, $modal, $q, Util, DistributionProtocol, DistributionOrder, Specimen, ExtensionsUtil,
-    SpecimensHolder, Alerts, CommentsUtil, DeleteUtil, SpecimenLabelPrinter, ParticipantSpecimensViewState) {
+    SpecimensHolder, Alerts, CommentsUtil, DeleteUtil, SpecimenLabelPrinter, ParticipantSpecimensViewState,
+    AuthorizationService) {
 
     function initOpts(scope, element, attrs) {
       scope.title = attrs.title || 'specimens.ops';
@@ -19,8 +20,24 @@ angular.module('os.biospecimen.specimen')
         scope.resourceOpts = {
           orderCreateOpts:    {resource: 'Order', operations: ['Create']},
           shipmentCreateOpts: {resource: 'ShippingAndTracking', operations: ['Create']},
-          specimenUpdateOpts: {cp: cpShortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Update']},
-          specimenDeleteOpts: {cp: cpShortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Delete']}
+          allSpecimenUpdateOpts: {
+            cp: cpShortTitle,
+            sites: sites,
+            resource: 'VisitAndSpecimen',
+            operations: ['Update']
+          },
+          specimenUpdateOpts: {
+            cp: cpShortTitle,
+            sites: sites,
+            resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
+            operations: ['Update']
+          },
+          specimenDeleteOpts: {
+            cp: cpShortTitle,
+            sites: sites,
+            resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
+            operations: ['Delete']
+          }
         };
       }
 
@@ -28,6 +45,11 @@ angular.module('os.biospecimen.specimen')
     }
 
     function initAllowDistribution(scope) {
+      if (!AuthorizationService.isAllowed(scope.resourceOpts.orderCreateOpts)) {
+        scope.allowDistribution = false;
+        return;
+      }
+
       if (!scope.cp) {
         scope.allowDistribution = true;
         return;

@@ -492,7 +492,7 @@ public class SpecimenDaoImpl extends AbstractDao<Specimen> implements SpecimenDa
 			return;
 		}
 
-		if (CollectionUtils.isEmpty(crit.siteCps())) {
+		if (CollectionUtils.isEmpty(crit.siteCps()) && CollectionUtils.isEmpty(crit.primarySpmnSiteCps())) {
 			if (!query.getAlias().equals("visit")) {
 				query.createAlias("specimen.visit", "visit");
 			}
@@ -513,7 +513,9 @@ public class SpecimenDaoImpl extends AbstractDao<Specimen> implements SpecimenDa
 			return;
 		}
 
-		if (CollectionUtils.isEmpty(crit.siteCps()) && crit.cpId() == null) {
+		if (CollectionUtils.isEmpty(crit.siteCps()) &&
+			CollectionUtils.isEmpty(crit.primarySpmnSiteCps()) &&
+			crit.cpId() == null) {
 			if (!query.getAlias().equals("visit")) {
 				query.createAlias("specimen.visit", "visit");
 			}

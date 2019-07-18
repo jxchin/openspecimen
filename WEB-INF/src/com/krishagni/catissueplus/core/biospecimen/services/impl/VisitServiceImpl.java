@@ -498,13 +498,14 @@ public class VisitServiceImpl implements VisitService, ObjectAccessor, Initializ
 	@Override
 	public List<Visit> getSpecimenVisits(List<String> specimenLabels) {
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		if (siteCps != null && siteCps.isEmpty()) {
+		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
+		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
 			return Collections.emptyList();
 		}
 
 		SpecimenListCriteria crit = new SpecimenListCriteria()
 			.labels(specimenLabels)
-			.siteCps(siteCps)
+			.siteCps(siteCps).primarySpmnSiteCps(primarySiteCps)
 			.useMrnSites(AccessCtrlMgr.getInstance().isAccessRestrictedBasedOnMrn());
 		return daoFactory.getSpecimenDao().getSpecimenVisits(crit);
 	}

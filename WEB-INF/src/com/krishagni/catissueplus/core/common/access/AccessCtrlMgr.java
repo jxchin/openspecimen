@@ -702,6 +702,23 @@ public class AccessCtrlMgr {
 		ensureVisitAndSpecimenObjectRights(visit.getRegistration(), Operation.DELETE, false);
 		ensureVisitAndSpecimenEximRights(visit.getRegistration());
 	}
+
+	//
+	// Specimen access rights
+	//
+	public static class SpecimenAccessRights {
+		public boolean admin;
+
+		public boolean allSpmns;
+
+		public boolean onlyPrimarySpmns;
+
+		public boolean phiAccess;
+
+		public boolean allowed(Specimen specimen) {
+			return (admin || allSpmns) ? true : (specimen.isPrimary() ? onlyPrimarySpmns : false);
+		}
+	}
 	
 	public void ensureCreateOrUpdateSpecimenRights(Long specimenId, boolean checkPhiAccess) {
 		ensureSpecimenObjectRights(specimenId, Operation.UPDATE, checkPhiAccess);
@@ -712,8 +729,18 @@ public class AccessCtrlMgr {
 	}
 
 	public void ensureCreateOrUpdateSpecimenRights(Specimen specimen, boolean checkPhiAccess) {
-		ensureVisitAndSpecimenObjectRights(specimen.getRegistration(), Operation.UPDATE, checkPhiAccess);
-		ensureVisitAndSpecimenEximRights(specimen.getRegistration());
+		Resource[] resources;
+		if (specimen.isPrimary()) {
+			resources = new Resource[] { Resource.VISIT_N_PRIMARY_SPMN, Resource.VISIT_N_SPECIMEN };
+		} else {
+			resources = new Resource[] { Resource.VISIT_N_SPECIMEN };
+		}
+
+
+		ensureVisitAndSpecimenObjectRights(specimen.getRegistration(), resources, Operation.UPDATE, checkPhiAccess);
+		if (isImportOp() || isExportOp()) {
+			ensureVisitAndSpecimenObjectRights(specimen.getRegistration(), resources, Operation.EXIM, false);
+		}
 	}
 
 	public boolean ensureReadSpecimenRights(Long specimenId) {
@@ -724,12 +751,46 @@ public class AccessCtrlMgr {
 		return ensureSpecimenObjectRights(specimenId, Operation.READ, checkPhiAccess);
 	}
 
-	public boolean ensureReadSpecimenRights(Specimen specimen) {
+	public SpecimenAccessRights ensureReadSpecimenRights(Specimen specimen) {
 		return ensureReadSpecimenRights(specimen, specimen.hasPhiFields());
 	}
 
-	public boolean ensureReadSpecimenRights(Specimen specimen, boolean checkPhiAccess) {
-		return ensureReadSpecimenRights(specimen.getRegistration(), checkPhiAccess);
+	public SpecimenAccessRights ensureReadSpecimenRights(Specimen specimen, boolean checkPhiAccess) {
+		SpecimenAccessRights rights = new SpecimenAccessRights();
+		if (AuthUtil.isAdmin()) {
+			rights.allSpmns = true;
+			rights.admin = true;
+			rights.phiAccess = true;
+			return rights;
+		}
+
+		CollectionProtocolRegistration cpr = specimen.getRegistration();
+		Resource[] resources;
+		try {
+			resources = new Resource[] { Resource.VISIT_N_SPECIMEN };
+			boolean phiRights = ensureVisitAndSpecimenObjectRights(cpr, resources, Operation.READ, checkPhiAccess);
+			if (isImportOp() || isExportOp()) {
+				ensureVisitAndSpecimenObjectRights(cpr, resources, Operation.EXIM, false);
+			}
+
+			rights.allSpmns = true;
+			rights.phiAccess = phiRights;
+		} catch (OpenSpecimenException ose) {
+			if (!ose.containsError(RbacErrorCode.ACCESS_DENIED) || !specimen.isPrimary()) {
+				throw ose;
+			}
+
+			resources = new Resource[] { Resource.VISIT_N_PRIMARY_SPMN };
+			boolean phiRights = ensureVisitAndSpecimenObjectRights(cpr, resources, Operation.READ, checkPhiAccess);
+			if (isImportOp() || isExportOp()) {
+				ensureVisitAndSpecimenObjectRights(cpr, resources, Operation.EXIM, false);
+			}
+
+			rights.onlyPrimarySpmns = true;
+			rights.phiAccess = phiRights;
+		}
+
+		return rights;
 	}
 
 	public boolean ensureReadSpecimenRights(CollectionProtocolRegistration cpr, boolean checkPhiAccess) {
@@ -1398,7 +1459,8 @@ public class AccessCtrlMgr {
 	}
 
 	public boolean hasVisitSpecimenEximRights(Long cpId) {
-		return hasEximRights(cpId, Resource.VISIT_N_SPECIMEN.getName());
+		return hasEximRights(cpId, Resource.VISIT_N_SPECIMEN.getName()) ||
+			hasEximRights(cpId, Resource.VISIT_N_PRIMARY_SPMN.getName());
 	}
 
 	public boolean hasStorageContainerEximRights() {

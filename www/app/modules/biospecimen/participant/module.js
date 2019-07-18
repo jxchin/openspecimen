@@ -32,13 +32,37 @@ angular.module('os.biospecimen.participant',
           cpViewCtx.codingEnabled = $scope.global.appProps.cp_coding_enabled;
 
           var sites = cp.cpSites.map(function(cpSite) { return cpSite.siteName; });
-          $scope.partRegOpts =        {cp: cp.shortTitle, sites: sites, resource: 'ParticipantPhi', operations: ['Create']};
-          $scope.orderCreateOpts =    {cp: cp.shortTitle, sites: sites, resource: 'Order', operations: ['Create']};
+          $scope.cpReadOpts = {resource: 'CollectionProtocol', operations: ['Read']};
+          $scope.partRegOpts = {cp: cp.shortTitle, sites: sites, resource: 'ParticipantPhi', operations: ['Create']};
+          $scope.orderCreateOpts = {cp: cp.shortTitle, sites: sites, resource: 'Order', operations: ['Create']};
           $scope.shipmentCreateOpts = {cp: cp.shortTitle, sites: sites, resource: 'ShippingAndTracking', operations: ['Create']};
-          $scope.specimenReadOpts   = {cp: cp.shortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Read']};
-          $scope.specimenUpdateOpts = {cp: cp.shortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Update']};
-          $scope.specimenDeleteOpts = {cp: cp.shortTitle, sites: sites, resource: 'VisitAndSpecimen', operations: ['Delete']};
-          $scope.cpReadOpts         = {resource: 'CollectionProtocol', operations: ['Read']};
+          $scope.specimenReadOpts = {
+            cp: cp.shortTitle,
+            sites: sites,
+            resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
+            operations: ['Read']
+          };
+
+          $scope.specimenUpdateOpts = {
+            cp: cp.shortTitle,
+            sites: sites,
+            resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
+            operations: ['Update']
+          };
+
+          $scope.allSpecimenUpdateOpts = {
+            cp: cp.shortTitle,
+            sites: sites,
+            resource: 'VisitAndSpecimen',
+            operations: ['Update']
+          };
+
+          $scope.specimenDeleteOpts = {
+            cp: cp.shortTitle,
+            sites: sites,
+            resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
+            operations: ['Delete']
+          };
         },
         resolve: {
           cp: function($stateParams, CollectionProtocol) {
@@ -53,7 +77,7 @@ angular.module('os.biospecimen.participant',
             });
 
             var visitSpmnEximAllowed = AuthorizationService.isAllowed({
-              resource: 'VisitAndSpecimen',
+              resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
               operations: ['Export Import'],
               cp: cp.shortTitle
             });

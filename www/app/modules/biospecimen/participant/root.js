@@ -72,7 +72,7 @@ angular.module('os.biospecimen.participant.root', ['os.biospecimen.models'])
       // Specimen and Visit Authorization Options
       $scope.specimenResource = {
         updateOpts: {
-          resource: 'VisitAndSpecimen',
+          resources: ['VisitAndSpecimen', 'VisitAndPrimarySpecimen'],
           operations: ['Update'],
           cp: $scope.cpr.cpShortTitle,
           sites: sites

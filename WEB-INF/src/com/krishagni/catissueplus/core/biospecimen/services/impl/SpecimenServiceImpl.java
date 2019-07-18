@@ -145,8 +145,8 @@ public class SpecimenServiceImpl implements SpecimenService, ObjectAccessor, Con
 				return ResponseEvent.error(ose);
 			}
 
-			boolean allowPhi = AccessCtrlMgr.getInstance().ensureReadSpecimenRights(specimen);
-			SpecimenDetail detail = SpecimenDetail.from(specimen, false, !allowPhi);
+			AccessCtrlMgr.SpecimenAccessRights rights = AccessCtrlMgr.getInstance().ensureReadSpecimenRights(specimen);
+			SpecimenDetail detail = SpecimenDetail.from(specimen, false, !rights.phiAccess, rights.onlyPrimarySpmns);
 			setDistributionStatus(detail);
 			return ResponseEvent.response(detail);
 		} catch (OpenSpecimenException ose) {
@@ -155,8 +155,6 @@ public class SpecimenServiceImpl implements SpecimenService, ObjectAccessor, Con
 			return ResponseEvent.serverError(e);
 		}
 	}
-
-
 
 	@Override
 	@PlusTransactional
@@ -691,11 +689,12 @@ public class SpecimenServiceImpl implements SpecimenService, ObjectAccessor, Con
 
 	private List<Specimen> getSpecimens(SpecimenListCriteria crit) {
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps(crit.cpId());
-		if (siteCps != null && siteCps.isEmpty()) {
+		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(crit.cpId());
+		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
 			return Collections.emptyList();
 		}
 
-		crit.siteCps(siteCps);
+		crit.siteCps(siteCps).primarySpmnSiteCps(primarySiteCps);
 		crit.useMrnSites(AccessCtrlMgr.getInstance().isAccessRestrictedBasedOnMrn());
 		return daoFactory.getSpecimenDao().getSpecimens(crit);
 	}
@@ -1227,9 +1226,9 @@ public class SpecimenServiceImpl implements SpecimenService, ObjectAccessor, Con
 					lastId = specimen.getId();
 
 					try {
-						boolean hasPhi = AccessCtrlMgr.getInstance().ensureReadSpecimenRights(specimen, true);
+						AccessCtrlMgr.SpecimenAccessRights rights = AccessCtrlMgr.getInstance().ensureReadSpecimenRights(specimen, true);
 
-						SpecimenDetail detail = SpecimenDetail.from(specimen, false, !hasPhi, true);
+						SpecimenDetail detail = SpecimenDetail.from(specimen, false, !rights.phiAccess, true);
 						if (specimen.isPrimary()) {
 							detail.setCollectionEvent(CollectionEventDetail.from(specimen.getCollectionEvent()));
 							detail.setReceivedEvent(ReceivedEventDetail.from(specimen.getReceivedEvent()));
@@ -1270,7 +1269,8 @@ public class SpecimenServiceImpl implements SpecimenService, ObjectAccessor, Con
 				}
 
 				List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps(cpId, false);
-				if (siteCps != null && siteCps.isEmpty()) {
+				List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
+				if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
 					endOfSpecimens = true;
 				} else if (!AccessCtrlMgr.getInstance().hasVisitSpecimenEximRights(cpId)) {
 					endOfSpecimens = true;
@@ -1278,6 +1278,7 @@ public class SpecimenServiceImpl implements SpecimenService, ObjectAccessor, Con
 					crit = new SpecimenListCriteria()
 						.labels(Utility.csvToStringList(params.get("specimenLabels")))
 						.siteCps(siteCps)
+						.primarySpmnSiteCps(primarySiteCps)
 						.useMrnSites(AccessCtrlMgr.getInstance().isAccessRestrictedBasedOnMrn())
 						.cpId(cpId);
 

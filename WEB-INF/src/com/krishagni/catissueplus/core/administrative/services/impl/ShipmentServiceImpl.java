@@ -365,13 +365,15 @@ public class ShipmentServiceImpl implements ShipmentService, ObjectAccessor {
 	}
 
 	private List<Specimen> getValidSpecimens(List<Long> specimenIds, OpenSpecimenException ose) {
-		List<SiteCpPair> siteCpPairs = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		if (siteCpPairs != null && siteCpPairs.isEmpty()) {
+		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
+		List<SiteCpPair> primarySpmnSiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
+		if (siteCps != null && siteCps.isEmpty() && primarySpmnSiteCps != null && primarySpmnSiteCps.isEmpty()) {
 			ose.addError(ShipmentErrorCode.INVALID_SPECIMENS);
 			return null;
 		}
 		
-		SpecimenListCriteria crit = new SpecimenListCriteria().ids(specimenIds).siteCps(siteCpPairs);
+		SpecimenListCriteria crit = new SpecimenListCriteria().ids(specimenIds)
+			.siteCps(siteCps).primarySpmnSiteCps(primarySpmnSiteCps);
 		List<Specimen> specimens = daoFactory.getSpecimenDao().getSpecimens(crit);
 		if (specimenIds.size() != specimens.size()) {
 			ose.addError(ShipmentErrorCode.INVALID_SPECIMENS);

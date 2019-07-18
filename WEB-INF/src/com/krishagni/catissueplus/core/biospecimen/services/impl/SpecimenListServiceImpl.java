@@ -523,12 +523,13 @@ public class SpecimenListServiceImpl implements SpecimenListService, Initializin
 
 	private List<Specimen> getReadAccessSpecimens(Long listId, int size) {
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		if (siteCps != null && siteCps.isEmpty()) {
+		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
+		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
 			return Collections.emptyList();
 		}
 
 		SpecimenListCriteria crit = new SpecimenListCriteria()
-			.specimenListId(listId).siteCps(siteCps)
+			.specimenListId(listId).siteCps(siteCps).primarySpmnSiteCps(primarySiteCps)
 			.maxResults(size).limitItems(true);
 		return daoFactory.getSpecimenDao().getSpecimens(crit);
 	}
@@ -540,11 +541,12 @@ public class SpecimenListServiceImpl implements SpecimenListService, Initializin
 		getSpecimenList(crit.specimenListId(), null);
 
 		List<SiteCpPair> siteCpPairs = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		if (siteCpPairs != null && siteCpPairs.isEmpty()) {
+		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
+		if (siteCpPairs != null && siteCpPairs.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
 			throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
 		}
 
-		return crit.siteCps(siteCpPairs);
+		return crit.siteCps(siteCpPairs).primarySpmnSiteCps(primarySiteCps);
 	}
 
 	private void ensureValidSpecimensAndUsers(SpecimenListDetail details, SpecimenList specimenList, List<SiteCpPair> siteCpPairs) {
