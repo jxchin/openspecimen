@@ -18,7 +18,8 @@ angular.module('os.biospecimen.specimen')
         }
 
         scope.resourceOpts = {
-          orderCreateOpts:    {resource: 'Order', operations: ['Create']},
+          containerReadOpts: {resource: 'StorageContainer', operations: ['Read']},
+          orderCreateOpts: {resource: 'Order', operations: ['Create']},
           shipmentCreateOpts: {resource: 'ShippingAndTracking', operations: ['Create']},
           allSpecimenUpdateOpts: {
             cp: cpShortTitle,
@@ -41,7 +42,13 @@ angular.module('os.biospecimen.specimen')
         };
       }
 
+      initAllowSpecimenTransfers(scope);
       initAllowDistribution(scope);
+    }
+
+    function initAllowSpecimenTransfers(scope) {
+      scope.allowSpmnTransfers = AuthorizationService.isAllowed(scope.resourceOpts.containerReadOpts) &&
+        AuthorizationService.isAllowed(scope.resourceOpts.specimenUpdateOpts);
     }
 
     function initAllowDistribution(scope) {
