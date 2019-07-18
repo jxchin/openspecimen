@@ -328,7 +328,7 @@ angular.module('os.biospecimen.participant.collect-specimens', ['os.biospecimen.
 
         var sites = cp.cpSites.map(function(cpSite) { return cpSite.siteName; });
         $scope.storeSpmnsAllowed = AuthorizationService.isAllowed(
-          {sites: sites, resource: 'StorageContainer', ops: ['Read']});
+          {sites: sites, resource: 'StorageContainer', operations: ['Read']});
 
         var printSettings = {};
         angular.forEach(cp.spmnLabelPrintSettings,
