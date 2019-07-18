@@ -32,7 +32,7 @@
         join s.accessList sa
       where
         s.id = :subjectId and
-        sa.resource = :resource and
+        sa.resource in (:resources) and
         sa.operation in (:operations)
     </query>
 

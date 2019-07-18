@@ -30,12 +30,17 @@ public class SubjectDaoImpl extends AbstractDao<Subject> implements SubjectDao {
 	@SuppressWarnings("unchecked")
 	@Override
 	public List<SubjectAccess> getAccessList(Long subjectId, String resource, String[] ops) {
-		return sessionFactory.getCurrentSession()
-				.getNamedQuery(GET_ACCESS_LIST)
-				.setLong("subjectId", subjectId)
-				.setString("resource", resource)
-				.setParameterList("operations", ops)
-				.list();
+		return getAccessList(subjectId, new String[] { resource }, ops);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<SubjectAccess> getAccessList(Long subjectId, String[] resources, String[] ops) {
+		return getCurrentSession().getNamedQuery(GET_ACCESS_LIST)
+			.setParameter("subjectId", subjectId)
+			.setParameterList("resources", resources)
+			.setParameterList("operations", ops)
+			.list();
 	}
 
 	@SuppressWarnings("unchecked")

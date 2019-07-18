@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -23,6 +24,7 @@ import com.krishagni.catissueplus.core.administrative.domain.Site;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
 import com.krishagni.catissueplus.core.biospecimen.repository.SpecimenListCriteria;
 import com.krishagni.catissueplus.core.common.access.SiteCpPair;
+import com.krishagni.catissueplus.core.common.events.Resource;
 
 public class BiospecimenDaoHelper {
 
@@ -36,15 +38,15 @@ public class BiospecimenDaoHelper {
 	}
 
 	public void addSiteCpsCond(Criteria query, SpecimenListCriteria crit) {
-		addSiteCpsCond(query, crit.siteCps(), crit.primarySpmnSiteCps(), crit.useMrnSites(), query.getAlias().equals("visit") ? "cpr" : "visit");
+		addSiteCpsCond(query, crit.siteCps(), crit.useMrnSites(), query.getAlias().equals("visit") ? "cpr" : "visit");
 	}
 
 	public void addSiteCpsCond(Criteria query, Collection<SiteCpPair> siteCps, boolean useMrnSites, String startAlias) {
-		addSiteCpsCond(query, siteCps, null, useMrnSites, startAlias);
+		addSiteCpsCond(query, siteCps, useMrnSites, startAlias, true);
 	}
 
-	public void addSiteCpsCond(Criteria query, Collection<SiteCpPair> siteCps, Collection<SiteCpPair> primarySpmnSiteCps, boolean useMrnSites, String startAlias) {
-		if (CollectionUtils.isEmpty(siteCps) && CollectionUtils.isEmpty(primarySpmnSiteCps)) {
+	public void addSiteCpsCond(Criteria query, Collection<SiteCpPair> siteCps, boolean useMrnSites, String startAlias, boolean spmnList) {
+		if (CollectionUtils.isEmpty(siteCps)) {
 			return;
 		}
 
@@ -66,63 +68,49 @@ public class BiospecimenDaoHelper {
 			.createAlias("pmi.site", "mrnSite", JoinType.LEFT_OUTER_JOIN);
 
 		Disjunction mainCond = Restrictions.disjunction();
-		if (CollectionUtils.isNotEmpty(siteCps)) {
-			mainCond.add(getSiteCpsCond(siteCps, useMrnSites));
-		}
-
-		if (CollectionUtils.isNotEmpty(primarySpmnSiteCps)) {
-			mainCond.add(
-				Restrictions.and(
-					Restrictions.eq("specimen.lineage", "New"),
-					getSiteCpsCond(primarySpmnSiteCps, useMrnSites)
-				)
-			);
+		Map<String, Set<SiteCpPair>> siteCpsMap = SiteCpPair.segregateByResources(siteCps);
+		for (Map.Entry<String, Set<SiteCpPair>> siteCpEntry : siteCpsMap.entrySet()) {
+			Junction siteCpsCond = getSiteCpsCond(siteCpEntry.getValue(), useMrnSites);
+			if (spmnList && Resource.VISIT_N_PRIMARY_SPMN.getName().equals(siteCpEntry.getKey())) {
+				mainCond.add(
+					Restrictions.and(
+						Restrictions.eq("specimen.lineage", "New"),
+						siteCpsCond
+					)
+				);
+			} else {
+				mainCond.add(siteCpsCond);
+			}
 		}
 
 		query.add(mainCond);
 	}
 
-	public String getSiteCpsCondAql(List<SiteCpPair> siteCps, boolean useMrnSites) {
+	public String getSiteCpsCondAql(Collection<SiteCpPair> siteCps, boolean useMrnSites) {
 		if (CollectionUtils.isEmpty(siteCps)) {
 			return StringUtils.EMPTY;
 		}
 
-		Set<String> cpSitesCond = new LinkedHashSet<>(); // joined by or
-		for (SiteCpPair siteCp : siteCps) {
-			List<String> siteCond = new ArrayList<>(); // joined by or
-			if (useMrnSites) {
-				//
-				// When MRNs exist, site ID should be one of the MRN site
-				//
-				String mrnSite =
-					"Participant.medicalRecord.mrnSiteId exists and " +
-					getAqlSiteIdRestriction("Participant.medicalRecord.mrnSiteId", siteCp);
-				siteCond.add(mrnSite);
-
-				//
-				// When no MRNs exist, site ID should be one of CP site
-				//
-				String cpSite =
-					"Participant.medicalRecord.mrnSiteId not exists and " +
-					getAqlSiteIdRestriction("CollectionProtocol.cpSites.siteId", siteCp);
-				siteCond.add(cpSite);
-			} else {
-				//
-				// Site ID should be either MRN site or CP site
-				//
-				siteCond.add(getAqlSiteIdRestriction("Participant.medicalRecord.mrnSiteId", siteCp));
-				siteCond.add(getAqlSiteIdRestriction("CollectionProtocol.cpSites.siteId", siteCp));
+		Map<String, Set<SiteCpPair>> siteCpsByResources = SiteCpPair.segregateByResources(siteCps);
+		StringBuilder aql = new StringBuilder();
+		for (Map.Entry<String, Set<SiteCpPair>> siteCpsEntry : siteCpsByResources.entrySet()) {
+			String restriction = getSiteCpsCondAql0(siteCpsEntry.getValue(), useMrnSites);
+			if (Resource.VISIT_N_PRIMARY_SPMN.getName().equals(siteCpsEntry.getKey())) {
+				restriction = "(Specimen.lineage = \"New\" and " + restriction + ")";
 			}
 
-			String cond = "(" + StringUtils.join(siteCond, " or ") + ")";
-			if (siteCp.getCpId() != null) {
-				cond += " and CollectionProtocol.id = " + siteCp.getCpId();
+			if (aql.length() > 0) {
+				aql.append(" or ");
 			}
 
-			cpSitesCond.add("(" + cond + ")");
+			aql.append(restriction);
 		}
 
-		return "(" + StringUtils.join(cpSitesCond, " or ") + ")";
+		if (aql.length() > 0) {
+			aql.insert(0, "(").append(")");
+		}
+
+		return aql.toString();
 	}
 
 	public DetachedCriteria getCpIdsFilter(Collection<SiteCpPair> siteCps) {
@@ -195,6 +183,49 @@ public class BiospecimenDaoHelper {
 		}
 
 		return cpSitesCond;
+	}
+
+	private String getSiteCpsCondAql0(Collection<SiteCpPair> siteCps, boolean useMrnSites) {
+		if (CollectionUtils.isEmpty(siteCps)) {
+			return StringUtils.EMPTY;
+		}
+
+		Set<String> cpSitesCond = new LinkedHashSet<>(); // joined by or
+		for (SiteCpPair siteCp : siteCps) {
+			List<String> siteCond = new ArrayList<>(); // joined by or
+			if (useMrnSites) {
+				//
+				// When MRNs exist, site ID should be one of the MRN site
+				//
+				String mrnSite =
+					"Participant.medicalRecord.mrnSiteId exists and " +
+						getAqlSiteIdRestriction("Participant.medicalRecord.mrnSiteId", siteCp);
+				siteCond.add(mrnSite);
+
+				//
+				// When no MRNs exist, site ID should be one of CP site
+				//
+				String cpSite =
+					"Participant.medicalRecord.mrnSiteId not exists and " +
+						getAqlSiteIdRestriction("CollectionProtocol.cpSites.siteId", siteCp);
+				siteCond.add(cpSite);
+			} else {
+				//
+				// Site ID should be either MRN site or CP site
+				//
+				siteCond.add(getAqlSiteIdRestriction("Participant.medicalRecord.mrnSiteId", siteCp));
+				siteCond.add(getAqlSiteIdRestriction("CollectionProtocol.cpSites.siteId", siteCp));
+			}
+
+			String cond = "(" + StringUtils.join(siteCond, " or ") + ")";
+			if (siteCp.getCpId() != null) {
+				cond += " and CollectionProtocol.id = " + siteCp.getCpId();
+			}
+
+			cpSitesCond.add("(" + cond + ")");
+		}
+
+		return "(" + StringUtils.join(cpSitesCond, " or ") + ")";
 	}
 
 	private Criterion getSiteIdRestriction(String property, SiteCpPair siteCp) {

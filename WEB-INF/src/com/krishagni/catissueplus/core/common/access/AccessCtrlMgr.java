@@ -826,10 +826,6 @@ public class AccessCtrlMgr {
 		return getReadAccessSpecimenSiteCps(cpId, true);
 	}
 
-	public List<SiteCpPair> getReadAccessPrimarySpecimenSiteCps(Long cpId) {
-		return new ArrayList<>(getVisitAndPrimarySpecimenSiteCps(cpId, new String[] {Operation.READ.getName()}));
-	}
-
 	public List<SiteCpPair> getReadAccessSpecimenSiteCps(Long cpId, boolean addOrderSites) {
 		if (AuthUtil.isAdmin()) {
 			return null;
@@ -838,7 +834,17 @@ public class AccessCtrlMgr {
 		String[] ops = {Operation.READ.getName()};
 		List<SiteCpPair> siteCpPairs = new ArrayList<>(getVisitAndSpecimenSiteCps(cpId, ops));
 		if (addOrderSites) {
-			siteCpPairs.addAll(getDistributionOrderSiteCps(ops));
+			Set<SiteCpPair> orderSiteCps = getDistributionOrderSiteCps(ops);
+			for (SiteCpPair orderSiteCp : orderSiteCps) {
+				orderSiteCp = orderSiteCp.copy();
+				orderSiteCp.setResource(Resource.VISIT_N_SPECIMEN.getName());
+				siteCpPairs.add(orderSiteCp);
+
+				orderSiteCp = orderSiteCp.copy();
+				orderSiteCp.setResource(Resource.VISIT_N_PRIMARY_SPMN.getName());
+				siteCpPairs.add(orderSiteCp);
+			}
+
 			siteCpPairs = deDupSiteCpPairs(siteCpPairs);
 		}
 
@@ -899,13 +905,14 @@ public class AccessCtrlMgr {
 	}
 
 	private Set<SiteCpPair> getVisitAndSpecimenSiteCps(Long cpId, String[] ops) {
-		return getSiteCps(Resource.VISIT_N_SPECIMEN.getName(), cpId, ops);
+		return getSiteCps(
+			new String[] { Resource.VISIT_N_SPECIMEN.getName(), Resource.VISIT_N_PRIMARY_SPMN.getName() },
+			cpId,
+			ops,
+			false
+		);
 	}
 
-	private Set<SiteCpPair> getVisitAndPrimarySpecimenSiteCps(Long cpId, String[] ops) {
-		return getSiteCps(Resource.VISIT_N_PRIMARY_SPMN.getName(), cpId, ops);
-	}
-	
 	//////////////////////////////////////////////////////////////////////////////////////
 	//                                                                                  //
 	//         Container type object access control helper methods                      //
@@ -1512,6 +1519,10 @@ public class AccessCtrlMgr {
 	}
 
 	public Set<SiteCpPair> getSiteCps(String resource, Long cpId, String[] ops, boolean excludeCps) {
+		return getSiteCps(new String[] { resource }, cpId, ops, excludeCps);
+	}
+
+	public Set<SiteCpPair> getSiteCps(String[] resources, Long cpId, String[] ops, boolean excludeCps) {
 		if (AuthUtil.isAdmin()) {
 			return null;
 		}
@@ -1519,9 +1530,9 @@ public class AccessCtrlMgr {
 		Long userId = AuthUtil.getCurrentUser().getId();
 		List<SubjectAccess> accessList;
 		if (cpId != null) {
-			accessList = daoFactory.getSubjectDao().getAccessList(userId, cpId, resource, ops);
+			accessList = daoFactory.getSubjectDao().getAccessList(userId, cpId, resources, ops);
 		} else {
-			accessList = daoFactory.getSubjectDao().getAccessList(userId, resource, ops);
+			accessList = daoFactory.getSubjectDao().getAccessList(userId, resources, ops);
 		}
 
 		Long instituteId = AuthUtil.getCurrentUserInstitute().getId();
@@ -1529,7 +1540,7 @@ public class AccessCtrlMgr {
 		for (SubjectAccess access : accessList) {
 			Long siteId = access.getSite() != null ? access.getSite().getId() : null;
 			cpId = access.getCollectionProtocol() != null ? access.getCollectionProtocol().getId() : null;
-			siteCps.add(SiteCpPair.make(instituteId, siteId, !excludeCps ? cpId : null));
+			siteCps.add(SiteCpPair.make(access.getResource(), instituteId, siteId, !excludeCps ? cpId : null));
 		}
 
 		return siteCps;

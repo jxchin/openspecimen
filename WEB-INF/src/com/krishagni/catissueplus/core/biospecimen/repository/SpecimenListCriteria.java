@@ -16,8 +16,6 @@ public class SpecimenListCriteria extends AbstractListCriteria<SpecimenListCrite
 
 	private List<SiteCpPair> siteCps;
 
-	private List<SiteCpPair> primarySpmnSiteCps;
-	
 	private List<String> labels;
 
 	private List<String> barcodes;
@@ -93,15 +91,6 @@ public class SpecimenListCriteria extends AbstractListCriteria<SpecimenListCrite
 	
 	public SpecimenListCriteria siteCps(List<SiteCpPair> siteCps) {
 		this.siteCps = siteCps;
-		return self();
-	}
-
-	public List<SiteCpPair> primarySpmnSiteCps() {
-		return primarySpmnSiteCps;
-	}
-
-	public SpecimenListCriteria primarySpmnSiteCps(List<SiteCpPair> siteCps) {
-		this.primarySpmnSiteCps = siteCps;
 		return self();
 	}
 

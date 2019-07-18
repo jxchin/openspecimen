@@ -384,8 +384,7 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 			// Step 3: Ensure user has specimen read rights
 			//
 			List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-			List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-			if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+			if (siteCps != null && siteCps.isEmpty()) {
 				return ResponseEvent.userError(RbacErrorCode.ACCESS_DENIED);
 			}
 
@@ -413,9 +412,9 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 			//
 			int count;
 			if (detail.getCancelOp() == null || detail.getCancelOp().equals(Boolean.FALSE)) {
-				count = reserveSpecimens(specimens, dp, user, time, detail.getComments(), siteCps, primarySiteCps);
+				count = reserveSpecimens(specimens, dp, user, time, detail.getComments(), siteCps);
 			} else {
-				count = cancelSpecimenReservation(specimens, dp, user, time, detail.getComments(), siteCps, primarySiteCps);
+				count = cancelSpecimenReservation(specimens, dp, user, time, detail.getComments(), siteCps);
 			}
 
 
@@ -521,13 +520,12 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 	@PlusTransactional
 	public void validateSpecimens(DistributionProtocol dp, List<Specimen> specimens) {
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+		if (siteCps != null && siteCps.isEmpty()) {
 			throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
 		}
 
 		OpenSpecimenException ose = new OpenSpecimenException(ErrorType.USER_ERROR);
-		ensureValidSpecimens(specimens, dp, siteCps, primarySiteCps, ose);
+		ensureValidSpecimens(specimens, dp, siteCps, ose);
 		ose.checkAndThrow();
 	}
 
@@ -602,14 +600,13 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 			}
 
 			List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-			List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-			if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+			if (siteCps != null && siteCps.isEmpty()) {
 				return ResponseEvent.userError(RbacErrorCode.ACCESS_DENIED);
 			}
 
 			daoFactory.getDistributionOrderDao().saveOrUpdate(order, true);
 
-			ensureValidSpecimens(order, siteCps, primarySiteCps, ose);
+			ensureValidSpecimens(order, siteCps, ose);
 			ose.checkAndThrow();
 
 			order = daoFactory.getDistributionOrderDao().getById(order.getId());
@@ -653,8 +650,7 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 			ose.checkAndThrow();
 
 			List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-			List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-			if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+			if (siteCps != null && siteCps.isEmpty()) {
 				throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
 			}
 
@@ -668,7 +664,7 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 			existingOrder.addOrUpdateExtension();
 
 
-			ensureValidSpecimens(existingOrder, siteCps, primarySiteCps, ose);
+			ensureValidSpecimens(existingOrder, siteCps, ose);
 			ose.checkAndThrow();
 
 			existingOrder = daoFactory.getDistributionOrderDao().getById(existingOrder.getId());
@@ -756,15 +752,14 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 
 	private List<Specimen> getReadAccessSpecimens(SpecimenListCriteria crit) {
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+		if (siteCps != null && siteCps.isEmpty()) {
 			return null;
 		}
 
-		return daoFactory.getSpecimenDao().getSpecimens(crit.siteCps(siteCps).primarySpmnSiteCps(primarySiteCps));
+		return daoFactory.getSpecimenDao().getSpecimens(crit.siteCps(siteCps));
 	}
 
-	private void ensureValidSpecimens(DistributionOrder order, List<SiteCpPair> siteCps, List<SiteCpPair> primarySiteCps, OpenSpecimenException ose) {
+	private void ensureValidSpecimens(DistributionOrder order, List<SiteCpPair> siteCps, OpenSpecimenException ose) {
 		if (order.getSpecimenList() != null || order.isForAllReservedSpecimens()) {
 			int startAt = 0, maxSpmns = 100;
 			Long orderId = order.getId();
@@ -786,7 +781,7 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 					}
 				}
 
-				ensureValidSpecimens(specimens, order.getDistributionProtocol(), siteCps, primarySiteCps, ose);
+				ensureValidSpecimens(specimens, order.getDistributionProtocol(), siteCps, ose);
 
 				startAt += specimens.size();
 				endOfSpecimens = (specimens.size() < maxSpmns);
@@ -797,7 +792,7 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 			}
 		} else {
 			List<Specimen> specimens = Utility.collect(order.getOrderItems(), "specimen");
-			ensureValidSpecimens(specimens, order.getDistributionProtocol(), siteCps, primarySiteCps, ose);
+			ensureValidSpecimens(specimens, order.getDistributionProtocol(), siteCps, ose);
 		}
 	}
 
@@ -814,17 +809,13 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 		);
 	}
 
-	private void ensureValidSpecimens(
-		List<Specimen> inputSpmns, DistributionProtocol dp,
-		List<SiteCpPair> siteCps, List<SiteCpPair> primarySiteCps,
-		OpenSpecimenException ose) {
-
+	private void ensureValidSpecimens(List<Specimen> inputSpmns, DistributionProtocol dp, List<SiteCpPair> siteCps, OpenSpecimenException ose) {
 		if (CollectionUtils.isEmpty(inputSpmns)) {
 			return;
 		}
 
 		List<Long> specimenIds = inputSpmns.stream().map(Specimen::getId).collect(Collectors.toList());
-		ensureSpecimensAccessibility(specimenIds, siteCps, primarySiteCps, ose);
+		ensureSpecimensAccessibility(specimenIds, siteCps, ose);
 
 		List<String> closedSpmns = inputSpmns.stream()
 			.filter(spmn -> !spmn.isActive()).map(Specimen::getLabel)
@@ -853,14 +844,8 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 		}
 	}
 
-	private void ensureSpecimensAccessibility(
-		List<Long> specimenIds,
-		List<SiteCpPair> siteCps, List<SiteCpPair> primarySiteCps,
-		OpenSpecimenException ose) {
-
-		SpecimenListCriteria crit = new SpecimenListCriteria().ids(specimenIds)
-			.siteCps(siteCps).primarySpmnSiteCps(primarySiteCps);
-
+	private void ensureSpecimensAccessibility(List<Long> specimenIds, List<SiteCpPair> siteCps, OpenSpecimenException ose) {
+		SpecimenListCriteria crit = new SpecimenListCriteria().ids(specimenIds).siteCps(siteCps);
 		String nonCompliantSpmnLabels = daoFactory.getSpecimenDao().getNonCompliantSpecimens(crit)
 			.stream().limit(10).collect(Collectors.joining(", "));
 		if (!nonCompliantSpmnLabels.isEmpty()) {
@@ -1042,18 +1027,14 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 		// Ensure user has specimen read rights
 		//
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+		if (siteCps != null && siteCps.isEmpty()) {
 			throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
 		}
 
-		return criteria.siteCps(siteCps).primarySpmnSiteCps(primarySiteCps);
+		return criteria.siteCps(siteCps);
 	}
 
-	private int reserveSpecimens(
-		Collection<Specimen> specimens, DistributionProtocol dp, User user, Date time, String comments,
-		List<SiteCpPair> siteCps, List<SiteCpPair> primarySiteCps) {
-
+	private int reserveSpecimens(Collection<Specimen> specimens, DistributionProtocol dp, User user, Date time, String comments, List<SiteCpPair> siteCps) {
 		//
 		// Filter out the specimens that have been already reserved for the DP
 		//
@@ -1065,7 +1046,7 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 		// Ensure the left out specimens are accessible to the user and can be distributed to the DP
 		//
 		OpenSpecimenException ose = new OpenSpecimenException(ErrorType.USER_ERROR);
-		ensureValidSpecimens(notReservedForDp, dp, siteCps, primarySiteCps, ose);
+		ensureValidSpecimens(notReservedForDp, dp, siteCps, ose);
 		ose.checkAndThrow();
 
 		List<SpecimenReservedEvent> events = notReservedForDp.stream().map(spmn -> {
@@ -1089,16 +1070,13 @@ public class DistributionOrderServiceImpl implements DistributionOrderService, O
 		return events.size();
 	}
 
-	private int cancelSpecimenReservation(
-		Collection<Specimen> specimens, DistributionProtocol dp, User user, Date time, String comments,
-		List<SiteCpPair> siteCps, List<SiteCpPair> primarySiteCps) {
-
+	private int cancelSpecimenReservation(Collection<Specimen> specimens, DistributionProtocol dp, User user, Date time, String comments, List<SiteCpPair> siteCps) {
 		//
 		// Ensure specimens are read accessible
 		//
 		OpenSpecimenException ose = new OpenSpecimenException(ErrorType.USER_ERROR);
 		List<Long> spmnIds = specimens.stream().map(Specimen::getId).collect(Collectors.toList());
-		ensureSpecimensAccessibility(spmnIds, siteCps, primarySiteCps, ose);
+		ensureSpecimensAccessibility(spmnIds, siteCps, ose);
 		ose.checkAndThrow();
 
 		//

@@ -523,13 +523,12 @@ public class SpecimenListServiceImpl implements SpecimenListService, Initializin
 
 	private List<Specimen> getReadAccessSpecimens(Long listId, int size) {
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-		if (siteCps != null && siteCps.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+		if (siteCps != null && siteCps.isEmpty()) {
 			return Collections.emptyList();
 		}
 
 		SpecimenListCriteria crit = new SpecimenListCriteria()
-			.specimenListId(listId).siteCps(siteCps).primarySpmnSiteCps(primarySiteCps)
+			.specimenListId(listId).siteCps(siteCps)
 			.maxResults(size).limitItems(true);
 		return daoFactory.getSpecimenDao().getSpecimens(crit);
 	}
@@ -541,12 +540,11 @@ public class SpecimenListServiceImpl implements SpecimenListService, Initializin
 		getSpecimenList(crit.specimenListId(), null);
 
 		List<SiteCpPair> siteCpPairs = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		List<SiteCpPair> primarySiteCps = AccessCtrlMgr.getInstance().getReadAccessPrimarySpecimenSiteCps(null);
-		if (siteCpPairs != null && siteCpPairs.isEmpty() && primarySiteCps != null && primarySiteCps.isEmpty()) {
+		if (siteCpPairs != null && siteCpPairs.isEmpty()) {
 			throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
 		}
 
-		return crit.siteCps(siteCpPairs).primarySpmnSiteCps(primarySiteCps);
+		return crit.siteCps(siteCpPairs);
 	}
 
 	private void ensureValidSpecimensAndUsers(SpecimenListDetail details, SpecimenList specimenList, List<SiteCpPair> siteCpPairs) {
@@ -659,8 +657,8 @@ public class SpecimenListServiceImpl implements SpecimenListService, Initializin
 		}
 
 		List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps();
-		String siteCpRestriction = BiospecimenDaoHelper.getInstance().getSiteCpsCondAql(
-			siteCps, AccessCtrlMgr.getInstance().isAccessRestrictedBasedOnMrn());
+		boolean useMrnSites = AccessCtrlMgr.getInstance().isAccessRestrictedBasedOnMrn();
+		String siteCpRestriction = BiospecimenDaoHelper.getInstance().getSiteCpsCondAql(siteCps, useMrnSites);
 		if (StringUtils.isNotBlank(siteCpRestriction)) {
 			restriction += " and " + siteCpRestriction;
 		}
