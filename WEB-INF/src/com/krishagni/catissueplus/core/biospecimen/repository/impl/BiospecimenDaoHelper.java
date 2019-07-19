@@ -203,7 +203,7 @@ public class BiospecimenDaoHelper {
 				//
 				String mrnSite =
 					"Participant.medicalRecord.mrnSiteId exists and " +
-						getAqlSiteIdRestriction("Participant.medicalRecord.mrnSiteId", siteCp);
+					getAqlSiteIdRestriction("Participant.medicalRecord.mrnSiteId", siteCp);
 				siteCond.add(mrnSite);
 
 				//
@@ -211,7 +211,7 @@ public class BiospecimenDaoHelper {
 				//
 				String cpSite =
 					"Participant.medicalRecord.mrnSiteId not exists and " +
-						getAqlSiteIdRestriction("CollectionProtocol.cpSites.siteId", siteCp);
+					getAqlSiteIdRestriction("CollectionProtocol.cpSites.siteId", siteCp);
 				siteCond.add(cpSite);
 			} else {
 				//

@@ -716,7 +716,7 @@ public class AccessCtrlMgr {
 		public boolean phiAccess;
 
 		public boolean allowed(Specimen specimen) {
-			return (admin || allSpmns) ? true : (specimen.isPrimary() ? onlyPrimarySpmns : false);
+			return admin || allSpmns || (onlyPrimarySpmns && specimen.isPrimary());
 		}
 	}
 	

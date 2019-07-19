@@ -14,7 +14,7 @@
             <th class="col" ng-class="{'os-col-15': storeSpmnsAllowed, 'os-col-25': !storeSpmnsAllowed}">
               <span>{{(barcodingEnabled ? 'specimens.barcode' : 'specimens.label') | translate}}</span>
             </th>
-            <th class="col os-col-10" ng-class="{'os-col-10': storeSpmnsAllowed, 'os-col-15': !storeSpmnsAllowed}">
+            <th class="col" ng-class="{'os-col-10': storeSpmnsAllowed, 'os-col-15': !storeSpmnsAllowed}">
               <span translate="specimens.qty">Quantity</span>
             </th>
             <th class="col os-col-25" ng-if="storeSpmnsAllowed">
@@ -60,7 +60,7 @@
                 <span translate="specimens.position">Position</span>
               </div>
             </th>
-            <th class="col os-col-10" ng-class="{'os-col-10': storeSpmnsAllowed, 'os-col-15': !storeSpmnsAllowed}">
+            <th class="col" ng-class="{'os-col-10': storeSpmnsAllowed, 'os-col-15': !storeSpmnsAllowed}">
               <span>Status</span>
             </th>
             <th class="col os-col-5">
@@ -195,7 +195,7 @@
                 </os-storage-position>
               </span>
             </td>
-            <td class="col os-col-10" ng-class="{'os-col-10': storeSpmnsAllowed, 'os-col-15': !storeSpmnsAllowed}"
+            <td class="col" ng-class="{'os-col-10': storeSpmnsAllowed, 'os-col-15': !storeSpmnsAllowed}"
               style="overflow: visible;">
               <os-select os-md-input edit-when="specimen.existingStatus != 'Collected'" list="specimenStatuses" 
                 ng-model="specimen.status" on-select="statusChanged(specimen)" required>
