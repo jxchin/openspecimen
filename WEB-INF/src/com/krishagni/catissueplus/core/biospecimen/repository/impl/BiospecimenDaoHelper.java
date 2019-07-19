@@ -38,7 +38,11 @@ public class BiospecimenDaoHelper {
 	}
 
 	public void addSiteCpsCond(Criteria query, SpecimenListCriteria crit) {
-		addSiteCpsCond(query, crit.siteCps(), crit.useMrnSites(), query.getAlias().equals("visit") ? "cpr" : "visit");
+		addSiteCpsCond(query, crit, true);
+	}
+
+	public void addSiteCpsCond(Criteria query, SpecimenListCriteria crit, boolean spmnList) {
+		addSiteCpsCond(query, crit.siteCps(), crit.useMrnSites(), query.getAlias().equals("visit") ? "cpr" : "visit", spmnList);
 	}
 
 	public void addSiteCpsCond(Criteria query, Collection<SiteCpPair> siteCps, boolean useMrnSites, String startAlias) {
