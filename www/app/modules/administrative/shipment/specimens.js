@@ -5,12 +5,18 @@ angular.module('os.administrative.shipment')
       totalItems: 0,
       currPage: 1,
       itemsPerPage: 50,
-      shipmentSpmns: [],
-      loading: false
+      shipmentSpmns: []
     };
 
     function init() {
       $scope.ctx = ctx;
+      ctx.emptyState = {
+        empty: true,
+        loading: true,
+        emptyMessage: 'specimens.empty_list',
+        loadingMessage: 'specimens.loading_list'
+      };
+
       loadSpecimens(); 
       $scope.$watch('ctx.currPage', loadSpecimens);
     }
@@ -18,19 +24,34 @@ angular.module('os.administrative.shipment')
     function loadSpecimens() {
       var startAt     = (ctx.currPage - 1) * ctx.itemsPerPage;
       var maxResults  = ctx.itemsPerPage + 1;
-      ctx.loading = true;
-      shipment.getSpecimens(startAt, maxResults).then(
+
+      ctx.emptyState.loading = true;
+      shipment.getSpecimens(startAt, maxResults, ctx.orderBy, ctx.direction).then(
         function(shipmentSpmns) {
           ctx.totalItems = (ctx.currPage - 1) * ctx.itemsPerPage + shipmentSpmns.length;
+
+          ctx.emptyState.loading = false;
+          ctx.emptyState.empty = (ctx.totalItems <= 0);
+
           if (shipmentSpmns.length >= maxResults) {
             shipmentSpmns.splice(shipmentSpmns.length - 1, 1);
           }
 
           ctx.shipmentSpmns = shipmentSpmns;
-          ctx.loading = false;
           angular.extend(ctx, ShipmentUtil.hasPpidAndExtIds(shipmentSpmns));
         }
       );
+    }
+
+    $scope.sortBy = function(attr) {
+      if (ctx.orderBy == attr) {
+        ctx.direction = (ctx.direction == 'asc' ? 'desc' : 'asc');
+      } else {
+        ctx.orderBy = attr;
+        ctx.direction = 'asc';
+      }
+
+      loadSpecimens();
     }
 
     init();

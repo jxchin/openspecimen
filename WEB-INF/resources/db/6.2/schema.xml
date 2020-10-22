@@ -804,6 +804,20 @@
     </sql>
   </changeSet>
 
+  <changeSet author="vpawar" id="PV: Anticipated specimens table">
+    <addColumn tableName="OS_CPR_ANTICIPATED_SPMNS">
+      <column name="CLINICAL_STATUS_ID" type="${int.type}"/>
+      <column name="CLINICAL_DIAGNOSIS_ID" type="${int.type}"/>
+      <column name="SPECIMEN_CLASS_ID" type="${int.type}"/>
+      <column name="SPECIMEN_TYPE_ID" type="${int.type}"/>
+      <column name="ANATOMIC_SITE_ID" type="${int.type}"/>
+      <column name="LATERALITY_ID" type="${int.type}"/>
+      <column name="PATH_STATUS_ID" type="${int.type}"/>
+      <column name="COLLECTION_CONTAINER_ID" type="${int.type}"/>
+      <column name="COLLECTION_PROCEDURE_ID" type="${int.type}"/>
+    </addColumn>
+  </changeSet>
+
   <changeSet author="vpawar" id="Track impersonated user ID in API calls log">
     <addColumn tableName="OS_USER_API_CALLS_LOG">
       <column name="IMPERSONATED_USER_ID" type="${int.type}"/>
@@ -1180,5 +1194,31 @@
           event_id = :new.identifier;
       end;
     </sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="PV activity status">
+    <addColumn tableName="CATISSUE_PERMISSIBLE_VALUE">
+      <column name="ACTIVITY_STATUS" type="${text.type}(16)" defaultValue="Active">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+  <changeSet author="vpawar" id="User time zone">
+    <addColumn tableName="CATISSUE_USER">
+      <column name="TIME_ZONE" type="${text.type}(32)"/>
+    </addColumn>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Time zone to use for bulk importing the records in the input CSV file">
+    <addColumn tableName="OS_BULK_IMPORT_JOBS">
+      <column name="TIME_ZONE" type="${text.type}(32)"/>
+    </addColumn>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Print job item ID">
+    <addColumn tableName="OS_LABEL_PRINT_JOB_ITEMS">
+      <column name="ITEM_ID" type="${int.type}"/>
+    </addColumn>
   </changeSet>
 </databaseChangeLog>

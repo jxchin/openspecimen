@@ -170,13 +170,18 @@ angular.module('os.biospecimen.models.form', ['os.common.models'])
       } else {
         $http.get(Form.url() + this.$id() + '/fields', {params: params}).then(
           function(resp) {
-            that.fields = resp.data;
+            that.fields = resp.data.filter(
+              function(field) {
+                return field.name.indexOf('__') != 0;
+              }
+            );
+
             that.staticFields = flattenStaticFields("", that.fields);
             that.extnForms = getExtnForms("", that.fields);
             that.extnFields = flattenExtnFields(that.extnForms);
 
             d.resolve(that.fields);
-            return resp.data;
+            return that.fields;
           }
         );
       }
@@ -198,6 +203,22 @@ angular.module('os.biospecimen.models.form', ['os.common.models'])
       }
  
       return undefined;
+    }
+
+    Form.createDataEntryToken = function(formCtxtId, objectId) {
+      return $http.post(Form.url() + 'data-entry-tokens', {formCtxtId: formCtxtId, objectId: objectId}).then(
+        function(resp) {
+          return resp.data;
+        }
+      );
+    }
+
+    Form.getDataEntryToken = function(token) {
+      return $http.get(Form.url() + 'data-entry-tokens/' + token).then(
+        function(resp) {
+          return resp.data;
+        }
+      );
     }
 
     function createRecordsList(formsRecords) {

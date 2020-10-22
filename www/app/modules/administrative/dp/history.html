@@ -1,6 +1,6 @@
 <div class="clearfix">
   <div class="os-btns pull-right">
-    <a class="btn default" ng-href="{{exportUrl}}" target="_blank" ng-disabled="!orders[0]">
+    <a class="btn default" ng-href="{{exportUrl}}" target="_blank" ng-disabled="!ctx.orders[0]" rel="noopener">
       <span class="fa fa-download"></span>
       <span translate="common.buttons.export">Export</span>
     </a>
@@ -29,16 +29,22 @@
       </div>
     </div>
     <div class="os-table-body">
-      <div class="row" ng-repeat="order in orders">
+      <div class="row" ng-if="ctx.emptyState.loading || ctx.emptyState.empty">
+        <div class="col os-col-100">
+          <os-empty-list state="ctx.emptyState"></os-empty-list>
+        </div>
+      </div>
+
+      <div class="row" ng-repeat="order in ctx.orders">
         <div class="col os-col-25">
           <a ui-sref="order-detail.overview({orderId: order.id})">
             {{order.name}}
           </a>
         </div>
         <div class="col os-col-15">{{order.executionDate | date: global.dateFmt}}</div>
-        <div class="col os-col-15">{{order.groupByAttrVals.specimenType}}</div>
-        <div class="col os-col-15">{{order.groupByAttrVals.anatomicSite}}</div>
-        <div class="col os-col-15">{{order.groupByAttrVals.pathologyStatus}}</div>
+        <div class="col os-col-15">{{order.groupByAttrVals.specimenType | osNoValue}}</div>
+        <div class="col os-col-15">{{order.groupByAttrVals.anatomicSite | osNoValue}}</div>
+        <div class="col os-col-15">{{order.groupByAttrVals.pathologyStatus | osNoValue}}</div>
         <div class="col os-col-15">{{order.distributedSpecimenCount}}</div>
       </div>
     </div>

@@ -28,8 +28,9 @@
         </button>
         <button class="default" ui-sref="user-password({userId: user.id})"
           ng-if="user.type != 'CONTACT' && user.domainName == global.defaultDomain &&
-                 currentUser.id != user.id && currentUser.admin &&
-                 user.activityStatus == 'Active' || user.activityStatus == 'Expired'">
+                 currentUser.id != user.id &&
+                 (currentUser.admin || currentUser.instituteAdmin) &&
+                 (user.activityStatus == 'Active' || user.activityStatus == 'Expired')">
           <span class="fa fa-key"></span>
           <span translate="common.buttons.reset_password">Reset Password</span>
         </button>
@@ -54,12 +55,12 @@
         <span>{{'user.expired' | translate: user }}</span>
       </div>
       <ul class="os-key-values os-two-cols">
-        <li class="item" ng-show="user.type != 'CONTACT'">
+        <li class="item" ng-if="user.type != 'CONTACT'">
           <strong class="key key-sm" translate="user.domain_name">Domain Name</strong>
           <span class="value value-md">{{user.domainName}}</span>
         </li>
       
-        <li class="item" ng-show="user.type != 'CONTACT'">
+        <li class="item" ng-if="user.type != 'CONTACT'">
           <strong class="key key-sm" translate="user.login_name">Login Name</strong>
           <span class="value value-md">{{user.loginName}}</span>
         </li>
@@ -89,12 +90,19 @@
           <span class="value value-md">{{'user.types.' + user.type | translate}}</span>
         </li>
 
-        <li show-if-admin class="item">
+        <li class="item">
+          <strong class="key key-sm" translate="user.time_zone">Time Zone</strong>
+          <span class="value value-md">{{user.timeZone | osNoValue}}</span>
+        </li>
+
+        <li class="item" ng-if="user.type != 'CONTACT'">
           <strong class="key key-sm" translate="user.manage_forms">Manage Forms?</strong>
-          <span class="value value-md" ng-switch on="user.manageForms">
-            <span ng-switch-when="true" translate="common.yes">Yes</span>
-            <span ng-switch-when="false" translate="common.no">No</span>
-          </span>
+          <span class="value value-md">{{user.manageForms | osBoolValue: 'common.yes': 'common.no': 'common.not_specified'}}</span>
+        </li>
+
+        <li class="item">
+          <strong class="key key-sm" translate="user.disable_notifs">Disable Email Notifications?</strong>
+          <span class="value value-md">{{user.dnd | osBoolValue: 'common.yes': 'common.no': 'common.not_specified'}}</span>
         </li>
       </ul>
 

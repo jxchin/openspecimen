@@ -1,6 +1,6 @@
 
 angular.module('os.biospecimen.extensions.util', [])
-  .factory('ExtensionsUtil', function($modal, Form, Alerts, ApiUrls) {
+  .factory('ExtensionsUtil', function($modal, $parse, Form, Alerts, ApiUrls) {
     var filesUrl = ApiUrls.getBaseUrl() + 'form-files';
 
     function getFileDownloadUrl(formId, recordId, ctrlName, fileId) {
@@ -51,7 +51,7 @@ angular.module('os.biospecimen.extensions.util', [])
       );
     };
     
-    function createExtensionFieldMap(entity) {
+    function createExtensionFieldMap(entity, sdeMode) {
       var extensionDetail = entity.extensionDetail;
       if (!extensionDetail) {
         return;
@@ -67,18 +67,38 @@ angular.module('os.biospecimen.extensions.util', [])
           } else if (!!attr.value || attr.value === 0) {
             attr.value = new Date(attr.value);
           }
+        } else if (sdeMode) {
+          if (attr.type == 'pvField' || attr.type == 'siteField') {
+            attr.value = attr.displayValue;
+          }
         }
 
-        extensionDetail.attrsMap[attr.name] = attr.type != 'subForm' ? attr.value : getSubformFieldMap(attr);
+        extensionDetail.attrsMap[attr.name] = attr.type != 'subForm' ? attr.value : getSubformFieldMap(attr, sdeMode);
+        if (attr.type != 'subForm') {
+          extensionDetail.attrsMap['$$' + attr.name + '_displayValue'] = attr.displayValue;
+        }
       });
     }
 
-    function getSubformFieldMap(sf) {
+    function getSubformFieldMap(sf, sdeMode) {
       var attrsMap = [];
       angular.forEach(sf.value, function(attrs, idx) {
-        attrsMap[idx] = {};
+        var map = attrsMap[idx] = {};
         angular.forEach(attrs, function(attr) {
-          attrsMap[idx][attr.name] = attr.value;
+          if (attr.type == 'datePicker') {
+            if (!isNaN(attr.value) && !isNaN(parseInt(attr.value))) {
+              attr.value = parseInt(attr.value);
+            } else if (!!attr.value || attr.value === 0) {
+              attr.value = new Date(attr.value);
+            }
+          } else if (sdeMode) {
+            if (attr.type == 'pvField' || attr.type == 'siteField') {
+              attr.value = attr.displayValue;
+            }
+          }
+
+          map[attr.name] = attr.value;
+          map['$$' + attr.name + '_displayValue'] = attr.displayValue;
         });
       })
 
@@ -90,7 +110,7 @@ angular.module('os.biospecimen.extensions.util', [])
         return undefined;
       }
 
-      createExtensionFieldMap(entity);
+      createExtensionFieldMap(entity, extnCtxt.sdeMode);
 
       return {
         formId: extnCtxt.formId,
@@ -103,6 +123,30 @@ angular.module('os.biospecimen.extensions.util', [])
         labelAlignment: 'horizontal',
         disableFields: disableFields || []
       };
+    }
+
+    function getMatchingForms(forms, rules, ctxt) {
+      var matchingRule = null;
+      for (var i = 0; i < rules.length; ++i) {
+        if (!rules[i].when) {
+          continue;
+        }
+
+        try {
+          if ($parse(rules[i].when)(ctxt)) {
+            matchingRule = rules[i];
+            break;
+          }
+        } catch (err) {
+          alert('Invalid rule expression: ' + (i + 1) + ': ' + err);
+        }
+      }
+
+      if (matchingRule && matchingRule.forms) {
+        forms = forms.filter(function(f) { return matchingRule.forms.indexOf(f.formName) > -1; });
+      }
+
+      return forms;
     }
 
     function sortForms(inputForms, orderSpec) {
@@ -181,6 +225,91 @@ angular.module('os.biospecimen.extensions.util', [])
       );
     }
 
+    //
+    // converts the DE form fields metadata to SDE metadata
+    //
+    function toSdeFields(prefix, formId, formDef) {
+      return toSdeFields0(prefix, formId, '', formDef);
+    }
+
+    function toSdeFields0(prefix, formId, sfPrefix, formDef) {
+      var fields = [];
+      for (var r = 0; r < formDef.rows.length; ++r) {
+        for (var c = 0; c < formDef.rows[r].length; ++c) {
+          var sdeField = toSdeField(prefix, formId, sfPrefix, formDef.rows[r][c]);
+          if (sdeField) {
+            fields.push(sdeField);
+          }
+        }
+      }
+
+      return fields;
+    }
+
+    function toSdeField(prefix, formId, sfPrefix, deField) {
+      var sdeField = {
+        name: prefix ? prefix + '.' + deField.name : deField.name,
+        caption: deField.caption,
+        optional: (deField.validationRules || []).every(function(r) { return r.name != 'required'; })
+      };
+
+      if (deField.type == 'stringTextField') {
+        sdeField.type = 'text';
+      } else if (deField.type == 'numberField') {
+        sdeField.type = 'text';
+        if (deField.noOfDigitsAfterDecimal) {
+          sdeField.pattern = '/^([0-9]+|[0-9]*\\.?[0-9]+[e]?[+-]?[0-9]*)$/';
+        } else {
+          sdeField.pattern = '/^[0-9]+$/';
+        }
+      } else if (deField.type == 'textArea') {
+        sdeField.type = 'textarea';
+      } else if (deField.type == 'radiobutton') {
+        sdeField.type = 'radio';
+        sdeField.options = deField.pvs.map(function(pv) { return pv.value; });
+      } else if (deField.type == 'booleanCheckbox') {
+        sdeField.type = 'toggle-checkbox';
+      } else if (deField.type == 'combobox' || deField.type == 'multiSelectListbox' || deField.type == 'checkbox') {
+        sdeField.type = 'dropdown';
+        sdeField.multiple = (deField.type != 'combobox');
+        sdeField.listSource = {
+          selectProp: 'value',
+          displayProp: 'value',
+          apiUrl: 'forms/' + formId + '/permissible-values',
+          queryParams: {
+            static: {
+              controlName: sfPrefix ? sfPrefix + '.' + deField.name : deField.name
+            }
+          }
+        };
+      } else if (deField.type == 'datePicker') {
+        sdeField.type = deField.format && deField.format.indexOf('HH:mm') != -1 ? 'datetime' : 'date';
+      } else if (deField.type == 'userField') {
+        sdeField.type = 'user';
+        sdeField.selectProp = 'id';
+      } else if (deField.type == 'siteField') {
+        sdeField.type = 'dropdown';
+        sdeField.listSource = {
+          selectProp: 'id',
+          displayProp: 'name',
+          apiUrl: 'sites'
+        };
+      } else if (deField.type == 'subForm') {
+        sdeField.type = 'collection';
+        sfPrefix = sfPrefix ? sfPrefix + '.' + deField.name : deField.name;
+        sdeField.fields = toSdeFields0('', formId, sfPrefix, deField);
+        if (!sdeField.fields || sdeField.fields.length == 0) {
+          sdeField = null;
+        }
+      } else {
+        sdeField = null;
+      }
+
+      return sdeField;
+    }
+
+    var viewTmpls = {};
+
     return {
       getFileDownloadUrl: getFileDownloadUrl,
 
@@ -190,9 +319,21 @@ angular.module('os.biospecimen.extensions.util', [])
 
       getExtnOpts: getExtnOpts,
 
+      getMatchingForms: getMatchingForms,
+
       sortForms: sortForms,
 
-      linkFormRecords: linkFormRecords
+      linkFormRecords: linkFormRecords,
+
+      registerView: function(name, viewTmpl) {
+        viewTmpls[name] = viewTmpl;
+      },
+
+      getViewTmpl: function(name) {
+        return viewTmpls[name];
+      },
+
+      toSdeFields: toSdeFields
     }
  
   });

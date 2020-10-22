@@ -26,7 +26,9 @@ import com.krishagni.catissueplus.core.de.events.GetFormFieldPvsOp;
 import com.krishagni.catissueplus.core.de.events.GetFormRecordsListOp;
 import com.krishagni.catissueplus.core.de.events.ListEntityFormsOp;
 import com.krishagni.catissueplus.core.de.events.ListFormFields;
+import com.krishagni.catissueplus.core.de.events.MoveFormRecordsOp;
 import com.krishagni.catissueplus.core.de.events.RemoveFormContextOp;
+
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.PermissibleValue;
 import edu.common.dynamicextensions.napi.FormData;
@@ -64,6 +66,8 @@ public interface FormService {
 
 	public ResponseEvent<FileDetail> uploadFile(RequestEvent<MultipartFile> req);
 
+	ResponseEvent<FileDetail> uploadImage(RequestEvent<String> req);
+
 	public ResponseEvent<Long> deleteRecord(RequestEvent<FormRecordCriteria> req);
 
 	public ResponseEvent<Long> addRecordEntry(RequestEvent<AddRecordEntryOp> req);
@@ -72,22 +76,26 @@ public interface FormService {
 	
 	public ResponseEvent<List<DependentEntityDetail>> getDependentEntities(RequestEvent<Long> req);
 
+	ResponseEvent<Integer> moveRecords(RequestEvent<MoveFormRecordsOp> req);
+
 	/**
 	 * Internal usage
 	 */
-	public List<FormData> getSummaryRecords(Long formId, List<Long> recordIds);
+	List<FormData> getSummaryRecords(Long formId, List<Long> recordIds);
 
-	public FormData getRecord(Container form, Long recordId);
+	FormData getRecord(Container form, Long recordId);
+
+	List<FormData> getRecords(Container form, List<Long> recordIds);
 	
-	public ResponseEvent<List<PermissibleValue>> getPvs(RequestEvent<GetFormFieldPvsOp> req);
+	ResponseEvent<List<PermissibleValue>> getPvs(RequestEvent<GetFormFieldPvsOp> req);
 
-	public void addFormContextProc(String entity, FormContextProcessor proc);
+	void addFormContextProc(String entity, FormContextProcessor proc);
 
-	public Map<String, Object> getExtensionInfo(Long cpId, String entityType);
+	Map<String, Object> getExtensionInfo(Long cpId, String entityType);
 
-	public Map<String, Object> getExtensionInfo(boolean cpBased, String entityType, Long entityId);
+	Map<String, Object> getExtensionInfo(boolean cpBased, String entityType, Long entityId);
 
-	public List<FormSummary> getEntityForms(Long cpId, String[] entityTypes);
+	List<FormSummary> getEntityForms(Long cpId, String[] entityTypes);
 
-	public void anonymizeRecord(Container form, Long recordId);
+	void anonymizeRecord(Container form, Long recordId);
 }

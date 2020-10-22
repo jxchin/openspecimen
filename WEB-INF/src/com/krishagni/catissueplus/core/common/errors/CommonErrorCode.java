@@ -9,6 +9,8 @@ public enum CommonErrorCode implements ErrorCode {
 
 	SQL_EXCEPTION,
 
+	DB_CONN_ERROR,
+
 	FILE_NOT_FOUND,
 
 	FILE_SEND_ERROR,
@@ -17,7 +19,9 @@ public enum CommonErrorCode implements ErrorCode {
 
 	CUSTOM_FIELD_LEVEL_REQ,
 
-	CUSTOM_FIELD_NAME_REQ;
+	CUSTOM_FIELD_NAME_REQ,
+
+	INVALID_TZ;
 
 	@Override
 	public String code() {

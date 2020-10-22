@@ -12,6 +12,7 @@ angular.module('os.biospecimen.participant')
       this.specimens = undefined;
       this.pendingSpmnsDispInterval = pendingSpmnsDispInterval;
       this.onlyOldPendingSpmns = false;
+      this.config = {};
     }
 
     function openSpecimenTree(specimens, openedNodesMap, treeCfg) {
@@ -86,14 +87,14 @@ angular.module('os.biospecimen.participant')
     }
 
     function prepareSpecimens(state, cpId, specimens) {
-      return CpConfigSvc.getWorkflowData(cpId, 'specimenTree', {}).then(
+      return CpConfigSvc.getSpecimenTreeCfg(cpId).then(
         function(treeCfg) {
           var opts = {hideDerivatives: treeCfg.hideDerivatives};
           state.specimens = Specimen.flatten(specimens, undefined, undefined, undefined, opts);
           openSpecimenTree(state.specimens, state.openedNodesMap, treeCfg);
           angular.forEach(state.specimens,
             function(spmn) {
-              ExtensionsUtil.createExtensionFieldMap(spmn);
+              ExtensionsUtil.createExtensionFieldMap(spmn, true);
             }
           );
 
@@ -107,10 +108,26 @@ angular.module('os.biospecimen.participant')
       );
     }
 
+    function filterSpecimens(visitsTab, cpr, specimens) {
+      var allowedEvents = cpr.getAllowedEvents(visitsTab);
+      return specimens.filter(
+        function(s) {
+          if (!!s.visitStatus && s.visitStatus != 'Pending') {
+            return true;
+          }
+
+          return !allowedEvents || !s.eventCode || allowedEvents.indexOf(s.eventCode) != -1;
+        }
+      );
+    }
+
     State.prototype.getSpecimens = function() {
+      var visitsTab = this.config && this.config.visitsTab;
+      var cpr = this.cpr;
+
       if (this.specimens) {
         var q = $q.defer();
-        q.resolve(this.specimens);
+        q.resolve(filterSpecimens(visitsTab, cpr, this.specimens));
         return q.promise;
       }
 
@@ -119,6 +136,10 @@ angular.module('os.biospecimen.participant')
         return Specimen.listFor(this.cpr.id).then(
           function(specimens) {
             return prepareSpecimens(that, that.cp.id, specimens);
+          }
+        ).then(
+          function(specimens) {
+            return filterSpecimens(visitsTab, cpr, specimens);
           }
         );
       } else if (this.selectedSpmn) {
@@ -156,7 +177,7 @@ angular.module('os.biospecimen.participant')
 
     State.prototype.getDescTmpl = function() {
       var that = this;
-      return CpConfigSvc.getWorkflowData(this.cpr.cpId, 'specimenTree', {}).then(
+      return CpConfigSvc.getSpecimenTreeCfg(this.cpr.cpId).then(
         function(data) {
           var tmpl = data.summaryDescTmpl || '';
           if (!!tmpl) {

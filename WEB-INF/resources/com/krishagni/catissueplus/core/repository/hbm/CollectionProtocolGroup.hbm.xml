@@ -15,15 +15,21 @@
 
     <property name="workflowsJson" column="WORKFLOWS"/>
 
+    <property name="activityStatus" column="ACTIVITY_STATUS"/>
+
     <set name="cps" table="OS_CP_GROUP_CPS">
       <key column="GROUP_ID"/>
-      <many-to-many class="com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol" column="CP_ID"/>
+      <many-to-many class="com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol" column="CP_ID">
+        <filter name="activeEntity" condition="activity_status != 'Disabled'"/>
+      </many-to-many>
     </set>
 
     <set name="forms" table="OS_CP_GROUP_FORMS" inverse="true" cascade="all-delete-orphan">
       <key column="GROUP_ID"/>
       <one-to-many class="com.krishagni.catissueplus.core.biospecimen.domain.CpGroupForm"/>
     </set>
+
+    <filter name="activeEntity"/>
 
     <query name="getByName">
       select

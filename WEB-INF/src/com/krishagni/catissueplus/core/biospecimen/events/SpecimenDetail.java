@@ -5,16 +5,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.krishagni.catissueplus.core.administrative.domain.PermissibleValue;
 import com.krishagni.catissueplus.core.administrative.events.StorageLocationSummary;
 import com.krishagni.catissueplus.core.biospecimen.domain.Specimen;
@@ -383,7 +380,6 @@ public class SpecimenDetail extends SpecimenInfo {
 					result.setSpecimensPool(getSpecimens(specimen.getVisit(), sr.getSpecimenPoolReqs(), specimen.getSpecimensPool(), partial, excludePhi, excludeChildren));
 				}
 				result.setPoolSpecimen(sr.isSpecimenPoolReq());
-
 				result.setChildren(getSpecimens(specimen.getVisit(), sr.getChildSpecimenRequirements(), specimen.getChildCollection(), partial, excludePhi, excludeChildren));
 			}
 
@@ -535,6 +531,7 @@ public class SpecimenDetail extends SpecimenInfo {
 
 		specimen.setVisitId(visit.getId());
 		specimen.setVisitName(visit.getName());
+		specimen.setVisitStatus(visit.getStatus());
 		specimen.setSprNo(visit.getSurgicalPathologyNumber());
 		specimen.setVisitDate(visit.getVisitDate());
 		Utility.nullSafeStream(specimen.getChildren()).forEach(child -> setVisitDetails(visit, child));

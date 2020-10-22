@@ -50,6 +50,7 @@
         <udn>startDate</udn>
         <caption>#getMessage("cp_start_date")</caption>
         <column>START_DATE</column>
+        <format>MM-dd-yyyy/dateOnly</format>
       </datePicker>
     </row>
     <row>
@@ -58,6 +59,7 @@
         <udn>endDate</udn>
         <caption>#getMessage("cp_end_date")</caption>
         <column>END_DATE</column>
+        <format>MM-dd-yyyy/dateOnly</format>
       </datePicker>
     </row>
     <row>
@@ -71,6 +73,14 @@
           <option><value>Closed</value></option>
         </options>
       </dropDown>
+    </row>
+    <row>
+      <numberField>
+        <name>catalogId</name>
+        <udn>catalogId</udn>
+        <caption>#getMessage("cp_catalog_id")</caption>
+        <column>CATALOG_ID</column>
+      </numberField>
     </row>
     <row>
       <subForm>
@@ -196,12 +206,33 @@
         </row>
       </subForm>
     </row>
+
+    <row>
+      <subForm>
+        <name>__userLabels</name>
+        <udn>__userLabels</udn>
+        <caption>User Labels</caption>
+        <table>OS_STARRED_CPS_VIEW</table>
+        <parentKey>IDENTIFIER</parentKey>
+        <foreignKey>CP_ID</foreignKey>
+
+        <row>
+          <numberField>
+            <name>userId</name>
+            <udn>userId</udn>
+            <caption>User ID</caption>
+            <column>USER_ID</column>
+          </numberField>
+        </row>
+      </subForm>
+    </row>
+
     <row>
       <subForm>
         <name>customFields</name>
         <udn>customFields</udn>
         <caption>#getMessage("cp_field_extensions")</caption>
-        <table>OS_CP_CUST_FIELD_EXTNS_VIEW</table>
+        <table>OS_CP_CUST_FIELDS</table>
         <foreignKey>CP_ID</foreignKey>
         <parentKey>IDENTIFIER</parentKey>
         <pathLink>true</pathLink>

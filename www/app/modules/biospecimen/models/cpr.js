@@ -5,7 +5,10 @@ angular.module('os.biospecimen.models.cpr',
     'os.biospecimen.models.visit',
     'os.biospecimen.models.form'
   ])
-  .factory('CollectionProtocolRegistration', function($filter, $http, osModel, Participant, Visit, Form, Util) {
+  .factory('CollectionProtocolRegistration', function(
+    $filter, $http, $parse, $injector, osModel,
+    Participant, Visit, Form, Util, ExtensionsUtil) {
+
     var CollectionProtocolRegistration = 
       osModel(
         'collection-protocol-registrations',
@@ -41,6 +44,17 @@ angular.module('os.biospecimen.models.cpr',
     CollectionProtocolRegistration.bulkRegistration = function(bulkRegDetail) {
       var url = CollectionProtocolRegistration.url() + '/bulk';
       return $http.post(url, bulkRegDetail).then(CollectionProtocolRegistration.modelRespTransform);
+    }
+
+    //Update registrations in bulk with same detail
+    CollectionProtocolRegistration.bulkEdit = function(detail) {
+      return $http.put(CollectionProtocolRegistration.url() + "bulk-update", detail)
+        .then(CollectionProtocolRegistration.modelArrayRespTransform);
+    }
+
+    CollectionProtocolRegistration.bulkDelete = function(cprIds, reason) {
+      return $http.delete(CollectionProtocolRegistration.url(), {params: {id: cprIds, forceDelete: true, reason: reason}})
+        .then(function(result) { return result.data; });
     }
 
     function prepareFilterOpts(cpId, includeStats, filterOpts) {
@@ -105,6 +119,10 @@ angular.module('os.biospecimen.models.cpr',
     }
 
     CollectionProtocolRegistration.prototype.getConsents = function() {
+      if ($injector.has('ecDocResponse')) {
+        return $injector.get('ecDocResponse').getConsents(this.$id());
+      }
+
       var url = CollectionProtocolRegistration.url() + this.$id() + "/consents";
       return $http.get(url).then(function(result) {return result.data;});
     }
@@ -117,6 +135,22 @@ angular.module('os.biospecimen.models.cpr',
     CollectionProtocolRegistration.prototype.anonymize = function() {
       var url = CollectionProtocolRegistration.url() + this.$id() + "/anonymize";
       return $http.put(url).then(CollectionProtocolRegistration.modelRespTransform);
+    }
+
+    CollectionProtocolRegistration.prototype.getAllowedEvents = function(visitsTab) {
+      if (!visitsTab.anticipatedEvents) {
+        return null;
+      }
+
+      ExtensionsUtil.createExtensionFieldMap(this.participant);
+      for (var i = 0; i < visitsTab.anticipatedEvents.length; ++i) {
+        var spec = visitsTab.anticipatedEvents[i];
+        if ($parse(spec.rule)({cpr: this})) {
+          return spec.events;
+        }
+      }
+
+      return null;
     }
 
     return CollectionProtocolRegistration;

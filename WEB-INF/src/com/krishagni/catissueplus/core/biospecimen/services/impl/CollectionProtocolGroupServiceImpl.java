@@ -13,6 +13,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 
+import com.krishagni.catissueplus.core.audit.services.impl.DeleteLogUtil;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolGroup;
 import com.krishagni.catissueplus.core.biospecimen.domain.CpGroupForm;
@@ -35,6 +36,8 @@ import com.krishagni.catissueplus.core.common.PlusTransactional;
 import com.krishagni.catissueplus.core.common.access.AccessCtrlMgr;
 import com.krishagni.catissueplus.core.common.access.SiteCpPair;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityOp;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityResp;
 import com.krishagni.catissueplus.core.common.events.EntityQueryCriteria;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
@@ -161,6 +164,26 @@ public class CollectionProtocolGroupServiceImpl implements CollectionProtocolGro
 		} catch (Exception e) {
 			return ResponseEvent.serverError(e);
 		}
+	}
+
+	@Override
+	@PlusTransactional
+	public ResponseEvent<BulkDeleteEntityResp<CollectionProtocolGroupSummary>> deleteGroups(RequestEvent<BulkDeleteEntityOp> req) {
+		Set<Long> groupIds = req.getPayload().getIds();
+
+		List<CollectionProtocolGroup> groups = daoFactory.getCpGroupDao().getByIds(groupIds);
+		if (groupIds.size() != groups.size()) {
+			groups.forEach(group -> groupIds.remove(group.getId()));
+			throw OpenSpecimenException.userError(CpGroupErrorCode.NOT_FOUND, groupIds);
+		}
+
+		groups.forEach(this::ensureUpdateAccess);
+		groups.forEach(group -> group.delete(req.getPayload().getReason()));
+
+		BulkDeleteEntityResp<CollectionProtocolGroupSummary> resp = new BulkDeleteEntityResp<>();
+		resp.setCompleted(true);
+		resp.setEntities(CollectionProtocolGroupSummary.from(groups));
+		return ResponseEvent.response(resp);
 	}
 
 	@Override
@@ -497,7 +520,7 @@ public class CollectionProtocolGroupServiceImpl implements CollectionProtocolGro
 		if (key == null) {
 			throw OpenSpecimenException.userError(FormErrorCode.NAME_REQUIRED);
 		} else if (form == null) {
-			throw OpenSpecimenException.userError(FormErrorCode.NOT_FOUND, key);
+			throw OpenSpecimenException.userError(FormErrorCode.NOT_FOUND, key, 1);
 		}
 
 		return form;

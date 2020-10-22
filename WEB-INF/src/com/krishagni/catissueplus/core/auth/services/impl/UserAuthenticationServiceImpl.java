@@ -45,13 +45,19 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 	private static final String ACCOUNT_LOCKED_NOTIF_TMPL = "account_locked_notification";
 
 	private DaoFactory daoFactory;
+
+	private com.krishagni.catissueplus.core.de.repository.DaoFactory deDaoFactory;
 	
 	private AuditService auditService;
 
 	public void setDaoFactory(DaoFactory daoFactory) {
 		this.daoFactory = daoFactory;
 	}
-	
+
+	public void setDeDaoFactory(com.krishagni.catissueplus.core.de.repository.DaoFactory deDaoFactory) {
+		this.deDaoFactory = deDaoFactory;
+	}
+
 	public void setAuditService(AuditService auditService) {
 		this.auditService = auditService;
 	}
@@ -172,6 +178,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 			loginAuditLog.setLogoutTime(Calendar.getInstance().getTime());
 			
 			daoFactory.getAuthDao().deleteAuthToken(token);
+			daoFactory.getAuthDao().deleteCredentials(token.getToken());
 			return ResponseEvent.response("Success");
 		} catch (Exception e) {	
 			return ResponseEvent.serverError(e);
@@ -190,6 +197,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 		Calendar cal = Calendar.getInstance();
 		cal.add(Calendar.MINUTE, -AuthConfig.getInstance().getTokenInactiveIntervalInMinutes());
 		daoFactory.getAuthDao().deleteInactiveAuthTokens(cal.getTime());
+		daoFactory.getAuthDao().deleteDanglingCredentials();
 	}
 	
 	public String generateToken(User user, LoginDetail loginDetail) {
@@ -271,6 +279,7 @@ public class UserAuthenticationServiceImpl implements UserAuthenticationService 
 		emailProps.put("failedLoginAttempts", failedLoginAttempts);
 		emailProps.put("$subject", subjParams);
 		emailProps.put("ccAdmin", false);
+		emailProps.put("ignoreDnd", true);
 
 		List<User> rcpts = daoFactory.getUserDao().getSuperAndInstituteAdmins(lockedUser.getInstitute().getName());
 		if (!rcpts.contains(lockedUser)) {

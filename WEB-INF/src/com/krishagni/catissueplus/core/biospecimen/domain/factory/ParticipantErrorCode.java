@@ -23,6 +23,8 @@ public enum ParticipantErrorCode implements ErrorCode {
 	DUP_UID,
 	
 	DUP_EMPI,
+
+	INVALID_EMAIL_ID,
 	
 	INVALID_VITAL_STATUS,
 	

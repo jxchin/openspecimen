@@ -67,24 +67,32 @@
           <span ng-switch-when="true" translate="participant.buttons.lookup">Lookup</span>
           <span ng-switch-default translate="participant.buttons.register">Register</span>
         </button>
-        <button class="btn btn-primary" os-form-submit="lookup(partCtx.cpEvents[0])"
-          ng-if="!partCtx.twoStep && partCtx.cpEvents.length == 1">
-          <span translate="participant.buttons.register_n_collect">Register & Collect</span>
-        </button>
-        <span dropdown ng-if="!partCtx.twoStep && partCtx.cpEvents.length > 1" on-toggle="toggleEventsMenu(open)">
-          <button class="btn btn-primary dropdown-toggle">
-            <span translate="participant.buttons.register_n_collect">Register & Collect</span>
-            <span class="fa fa-caret-down"></span>
+        <span show-if-allowed="consentUpdateOpts">
+          <button class="btn btn-primary" os-form-submit="lookup(null, true)"
+            ng-if="!partCtx.twoStep && partCtx.documentsCount > 0">
+            <span translate="participant.buttons.register_n_consent">Register & Consent</span>
           </button>
-          <ul class="dropdown-menu os-dropdown" os-ui-element="partCtx.eventsDd">
-            <li ng-repeat="event in partCtx.cpEvents">
-              <a os-form-submit="lookup(event)">
-                <os-event-desc event-point="event.eventPoint" event-point-unit="event.eventPointUnit"
-                  event-label="event.eventLabel">
-                </os-event-desc>
-              </a>
-            </li>
-          </ul>
+        </span>
+        <span show-if-allowed="specimenUpdateOpts">
+          <button class="btn btn-primary" os-form-submit="lookup(partCtx.cpEvents[0])"
+            ng-if="!partCtx.twoStep && partCtx.cpEvents.length == 1">
+            <span translate="participant.buttons.register_n_collect">Register & Collect</span>
+          </button>
+          <span dropdown ng-if="!partCtx.twoStep && partCtx.cpEvents.length > 1" on-toggle="toggleEventsMenu(open)">
+            <button class="btn btn-primary dropdown-toggle">
+              <span translate="participant.buttons.register_n_collect">Register & Collect</span>
+              <span class="fa fa-caret-down"></span>
+            </button>
+            <ul class="dropdown-menu os-dropdown" os-ui-element="partCtx.eventsDd">
+              <li ng-repeat="event in partCtx.cpEvents">
+                <a os-form-submit="lookup(event)">
+                  <os-event-desc event-point="event.eventPoint" event-point-unit="event.eventPointUnit"
+                    event-label="event.eventLabel">
+                  </os-event-desc>
+                </a>
+              </li>
+            </ul>
+          </span>
         </span>
         <button class="btn os-btn-text" ng-click="back()">
           <span translate="common.buttons.discard">Discard</span>
@@ -279,24 +287,32 @@
               <span ng-switch-when="true" translate="participant.buttons.update_registration"> Update </span>
               <span ng-switch-default translate="participant.buttons.register"> Register </span>
             </button>
-            <button class="btn btn-primary" os-form-submit="register(partCtx.cpEvents[0])"
-              ng-if="!cpr.id && partCtx.cpEvents.length == 1">
-              <span translate="participant.buttons.register_n_collect">Register & Collect</span>
-            </button>
-            <span dropdown ng-if="!cpr.id && partCtx.cpEvents.length > 1" on-toggle="toggleEventsMenu(open)">
-              <button class="btn btn-primary dropdown-toggle">
-                <span translate="participant.buttons.register_n_collect">Register & Collect</span>
-                <span class="fa fa-caret-down"></span>
+            <span show-if-allowed="consentUpdateOpts">
+              <button class="btn btn-primary" os-form-submit="register(null, true)"
+                ng-if="!cpr.id && partCtx.documentsCount > 0">
+                <span translate="participant.buttons.register_n_consent">Register & Consent</span>
               </button>
-              <ul class="dropdown-menu os-dropdown" os-ui-element="partCtx.eventsDd">
-                <li ng-repeat="event in partCtx.cpEvents">
-                  <a os-form-submit="register(event)">
-                    <os-event-desc event-point="event.eventPoint" event-point-unit="event.eventPointUnit"
-                      event-label="event.eventLabel">
-                    </os-event-desc>
-                  </a>
-                </li>
-              </ul>
+            </span>
+            <span show-if-allowed="specimenUpdateOpts">
+              <button class="btn btn-primary" os-form-submit="register(partCtx.cpEvents[0])"
+                ng-if="!cpr.id && partCtx.cpEvents.length == 1">
+                <span translate="participant.buttons.register_n_collect">Register & Collect</span>
+              </button>
+              <span dropdown ng-if="!cpr.id && partCtx.cpEvents.length > 1" on-toggle="toggleEventsMenu(open)">
+                <button class="btn btn-primary dropdown-toggle">
+                  <span translate="participant.buttons.register_n_collect">Register & Collect</span>
+                  <span class="fa fa-caret-down"></span>
+                </button>
+                <ul class="dropdown-menu os-dropdown" os-ui-element="partCtx.eventsDd">
+                  <li ng-repeat="event in partCtx.cpEvents">
+                    <a os-form-submit="register(event)">
+                      <os-event-desc event-point="event.eventPoint" event-point-unit="event.eventPointUnit"
+                        event-label="event.eventLabel">
+                      </os-event-desc>
+                    </a>
+                  </li>
+                </ul>
+              </span>
             </span>
             <button class="btn os-btn-text" ng-click="previous()">
               <span translate="common.buttons.back">Back</span>
@@ -367,6 +383,16 @@
         <label class="part-label" translate="participant.middle_name"></label>
         <input type="text" ng-model="cpr.participant.middleName" class="form-control"
           placeholder="{{'participant.middle_name' | translate}}"/>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="col-xs-3 control-label">
+        <span translate="participant.email_address">Email Address</span>
+      </label>
+      <div class="col-xs-6">
+        <input type="text" ng-model="cpr.participant.emailAddress" class="form-control"
+          placeholder="{{'participant.email_address' | translate}}"/>
       </div>
     </div>
 
@@ -457,7 +483,7 @@
       </div>
 
       <div os-unique-items>
-        <div class="form-group clearfix" ng-repeat="pmi in cpr.participant.pmis">
+        <div class="form-group clearfix" ng-repeat="pmi in cpr.participant.pmis track by $index">
           <ng-form name="pmiForm" os-form-validator="pmiForm" parent-validator="pformValidator">
             <fieldset record-name="cpr.participant.pmis">
               <div class="col-xs-3 col-xs-offset-3" ng-switch on="!!partCtx.mrnAccessRestriction">
@@ -490,6 +516,14 @@
               </div>
             <fieldset>
           </ng-form>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="col-xs-offset-3 col-xs-9">
+          <button class="btn os-btn-text os-no-left-padding" ng-click="cpr.participant.addPmi(cpr.participant.newPmi())">
+            <span translate="common.buttons.add_another">Add Another</span>
+          </button>
         </div>
       </div>
     </div>

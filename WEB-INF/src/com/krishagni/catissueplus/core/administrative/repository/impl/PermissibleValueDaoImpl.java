@@ -19,9 +19,15 @@ import com.krishagni.catissueplus.core.administrative.events.ListPvCriteria;
 import com.krishagni.catissueplus.core.administrative.repository.PermissibleValueDao;
 import com.krishagni.catissueplus.core.common.OrderBySubstringMatch;
 import com.krishagni.catissueplus.core.common.repository.AbstractDao;
+import com.krishagni.catissueplus.core.common.util.Status;
 
 
 public class PermissibleValueDaoImpl extends AbstractDao<PermissibleValue> implements PermissibleValueDao {
+
+	@Override
+	public Class<PermissibleValue> getType() {
+		return PermissibleValue.class;
+	}
 
 	@Override
 	public PermissibleValue getById(Long id) {
@@ -219,7 +225,7 @@ public class PermissibleValueDaoImpl extends AbstractDao<PermissibleValue> imple
 	}
 	
 	private Criteria getPvQuery(ListPvCriteria crit) {
-		Criteria query = sessionFactory.getCurrentSession().createCriteria(PermissibleValue.class);
+		Criteria query = getCurrentSession().createCriteria(PermissibleValue.class);
 		if (crit.values() != null) {
 			query.add(Restrictions.in("value", crit.values()));
 		}
@@ -247,7 +253,13 @@ public class PermissibleValueDaoImpl extends AbstractDao<PermissibleValue> imple
 			query.createAlias("parent", "root", JoinType.LEFT_OUTER_JOIN)
 				.add(Restrictions.isNull("root.id"));
 		}
-		
+
+		if (StringUtils.isBlank(crit.activityStatus())) {
+			query.add(Restrictions.eq("activityStatus", Status.ACTIVITY_STATUS_ACTIVE.getStatus()));
+		} else if (!crit.activityStatus().equalsIgnoreCase("all")) {
+			query.add(Restrictions.eq("activityStatus", crit.activityStatus()));
+		}
+
 		return query;
 	}
 

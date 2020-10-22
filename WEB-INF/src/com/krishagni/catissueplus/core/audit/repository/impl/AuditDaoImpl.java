@@ -46,7 +46,6 @@ import edu.common.dynamicextensions.ndao.DbSettingsFactory;
 
 public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDao {
 
-
 	@Override
 	@SuppressWarnings("unchecked")
 	public AuditDetail getAuditDetail(String auditTable, Long objectId) {
@@ -71,7 +70,15 @@ public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDa
 	@Override
 	@SuppressWarnings("unchecked")
 	public List<RevisionDetail> getRevisions(String auditTable, Long objectId) {
-		List<Object[]> rows = getCurrentSession().createSQLQuery(String.format(GET_REV_INFO_SQL, auditTable, ""))
+		String[] parts = auditTable.split(":");
+
+		auditTable = parts[0];
+		String idColumn = "IDENTIFIER";
+		if (parts.length > 1 && StringUtils.isNotBlank(parts[1])) {
+			idColumn = parts[1];
+		}
+
+		List<Object[]> rows = getCurrentSession().createSQLQuery(String.format(GET_REV_INFO_SQL, auditTable, idColumn, ""))
 			.addScalar("rev", LongType.INSTANCE)
 			.addScalar("revTime", TimestampType.INSTANCE)
 			.addScalar("userId", LongType.INSTANCE)
@@ -161,7 +168,15 @@ public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDa
 
 	@SuppressWarnings("unchecked")
 	private Object[] getLatestRevisionInfo(String auditTable, Long objectId, int revType) {
-		String sql = String.format(GET_REV_INFO_SQL, auditTable, "and a.revtype = :revType");
+		String[] parts = auditTable.split(":");
+
+		auditTable = parts[0];
+		String idColumn = "IDENTIFIER";
+		if (parts.length > 1 && StringUtils.isNotBlank(parts[1])) {
+			idColumn = parts[1];
+		}
+
+		String sql = String.format(GET_REV_INFO_SQL, auditTable, idColumn, "and a.revtype = :revType");
 		List<Object[]> rows = getCurrentSession().createSQLQuery(sql)
 			.addScalar("rev", LongType.INSTANCE)
 			.addScalar("revTime", TimestampType.INSTANCE)
@@ -223,8 +238,8 @@ public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDa
 			query.add(Restrictions.le("r.revtstmp", criteria.endDate()));
 		}
 
-		if (criteria.userId() != null) {
-			query.add(Restrictions.eq("u.id", criteria.userId()));
+		if (CollectionUtils.isNotEmpty(criteria.userIds())) {
+			query.add(Restrictions.in("u.id", criteria.userIds()));
 		}
 
 		if (criteria.lastId() != null) {
@@ -295,8 +310,8 @@ public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDa
 			.addScalar("last_name", StringType.INSTANCE)
 			.addScalar("email_address", StringType.INSTANCE);
 
-		if (criteria.userId() != null) {
-			query.setParameter("userId", criteria.userId());
+		if (CollectionUtils.isNotEmpty(criteria.userIds())) {
+			query.setParameterList("userIds", criteria.userIds());
 		}
 
 		if (criteria.startDate() != null) {
@@ -321,8 +336,8 @@ public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDa
 	private String buildBaseFormDataRevisionsQuery(RevisionsListCriteria criteria) {
 		List<String> whereClauses = new ArrayList<>();
 
-		if (criteria.userId() != null) {
-			whereClauses.add("e.user_id = :userId");
+		if (CollectionUtils.isNotEmpty(criteria.userIds())) {
+			whereClauses.add("e.user_id in (:userIds)");
 		}
 
 		if (criteria.startDate() != null) {
@@ -448,7 +463,7 @@ public class AuditDaoImpl extends AbstractDao<UserApiCallLog> implements AuditDa
 		"  inner join %s a on a.rev = r.rev " +
 		"  inner join catissue_user u on u.identifier = r.user_id " +
 		"where " +
-		"  a.identifier = :objectId " +
+		"  a.%s = :objectId " +
 		"  %s " +	// for additional constraints if any
 		"order by " +
 		"  r.revtstmp desc";

@@ -8,10 +8,14 @@ public enum Resource {
 	PARTICIPANT("ParticipantPhi"),
 	
 	PARTICIPANT_DEID("ParticipantDeid"),
-	
-	VISIT_N_SPECIMEN("VisitAndSpecimen"),
 
-	VISIT_N_PRIMARY_SPMN("VisitAndPrimarySpecimen"),
+	CONSENT("Consent"),
+
+	VISIT("Visit"),
+	
+	SPECIMEN("Specimen"),
+
+	PRIMARY_SPECIMEN("PrimarySpecimen"),
 	
 	SURGICAL_PATHOLOGY_REPORT("SurgicalPathologyReport"),
 	
@@ -25,7 +29,10 @@ public enum Resource {
 
 	SCHEDULED_JOB("ScheduledJob"),
 	
-	SHIPPING_N_TRACKING("ShippingAndTracking")
+	SHIPPING_N_TRACKING("ShippingAndTracking"),
+
+	QUERY("Query")
+
 	;
 
 	private final String name;

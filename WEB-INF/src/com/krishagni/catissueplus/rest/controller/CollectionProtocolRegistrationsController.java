@@ -3,15 +3,15 @@ package com.krishagni.catissueplus.rest.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.krishagni.catissueplus.core.biospecimen.domain.Participant;
 import com.krishagni.catissueplus.core.biospecimen.events.BulkRegistrationsDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolRegistrationDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.ConsentDetail;
@@ -34,6 +35,9 @@ import com.krishagni.catissueplus.core.biospecimen.events.VisitDetail;
 import com.krishagni.catissueplus.core.biospecimen.repository.CprListCriteria;
 import com.krishagni.catissueplus.core.biospecimen.services.CollectionProtocolRegistrationService;
 import com.krishagni.catissueplus.core.biospecimen.services.CollectionProtocolService;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityOp;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityResp;
+import com.krishagni.catissueplus.core.common.events.BulkEntityDetail;
 import com.krishagni.catissueplus.core.common.events.DependentEntityDetail;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
@@ -62,10 +66,9 @@ public class CollectionProtocolRegistrationsController {
 	@RequestMapping(method = RequestMethod.POST, value = "/list")
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
-	public List<CprSummary> getRegistrations(@RequestBody CprListCriteria crit) {
-		ResponseEvent<List<CprSummary>> resp = cpSvc.getRegisteredParticipants(getRequest(crit.includePhi(true)));
-		resp.throwErrorIfUnsuccessful();
-		return resp.getPayload();
+	public List<CollectionProtocolRegistrationDetail> getRegistrations(@RequestBody CprListCriteria crit) {
+		crit.orderBy("registrationDate").asc(false);
+		return ResponseEvent.unwrap(cpSvc.getRegisteredParticipants(RequestEvent.wrap(crit)));
 	}
 
 	@RequestMapping(method = RequestMethod.POST, value = "/count")
@@ -125,12 +128,20 @@ public class CollectionProtocolRegistrationsController {
 			
 			@RequestBody 
 			CollectionProtocolRegistrationDetail cprDetail) {
-		
+
+		cprDetail.setId(cprId);
 		ResponseEvent<CollectionProtocolRegistrationDetail> resp = cprSvc.updateRegistration(getRequest(cprDetail));
 		resp.throwErrorIfUnsuccessful();
 		return resp.getPayload();
 	}
-	
+
+	@RequestMapping(method = RequestMethod.PUT, value = "/bulk-update")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public List<CollectionProtocolRegistrationDetail> bulkUpdateRegistrations(@RequestBody BulkEntityDetail<CollectionProtocolRegistrationDetail> detail) {
+		return ResponseEvent.unwrap(cprSvc.bulkUpdateRegistrations(RequestEvent.wrap(detail)));
+	}
+
 	@RequestMapping(method = RequestMethod.PUT, value = "/{id}/anonymize")
 	@ResponseStatus(HttpStatus.OK)
 	@ResponseBody
@@ -173,6 +184,26 @@ public class CollectionProtocolRegistrationsController {
 		ResponseEvent<CollectionProtocolRegistrationDetail> resp = cprSvc.deleteRegistration(getRequest(crit));
 		resp.throwErrorIfUnsuccessful();
 		return resp.getPayload();
+	}
+
+	@RequestMapping(method = RequestMethod.DELETE)
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public BulkDeleteEntityResp<CprSummary> deleteRegistrations(
+		@RequestParam(value = "id")
+		Long[] ids,
+
+		@RequestParam(value = "forceDelete", required = false, defaultValue = "false")
+		boolean forceDelete,
+
+		@RequestParam(value = "reason", required = false, defaultValue = "")
+		String reason) {
+
+		BulkDeleteEntityOp crit = new BulkDeleteEntityOp();
+		crit.setIds(new HashSet<>(Arrays.asList(ids)));
+		crit.setForceDelete(forceDelete);
+		crit.setReason(reason);
+		return ResponseEvent.unwrap(cprSvc.deleteRegistrations(RequestEvent.wrap(crit)));
 	}
 
 	@RequestMapping(method = RequestMethod.GET, value="/{id}/consent-form")
@@ -281,13 +312,23 @@ public class CollectionProtocolRegistrationsController {
 		resp.throwErrorIfUnsuccessful();
 		return resp.getPayload();				
 	}
-	
+
+	@RequestMapping(method = RequestMethod.GET, value="/extension-form")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public Map<String, Object> getForm(
+		@RequestParam(value = "cpId", required = false, defaultValue = "-1")
+		Long cpId) {
+
+		return formSvc.getExtensionInfo(cpId, Participant.EXTN);
+	}
+
 	private RequestEvent<RegistrationQueryCriteria> getRegQueryReq(Long cprId) {
 		RegistrationQueryCriteria crit = new RegistrationQueryCriteria();
 		crit.setCprId(cprId);
 		return new RequestEvent<>(crit);
 	}
-	
+
 	private <T> RequestEvent<T> getRequest(T payload) {
 		return new RequestEvent<T>(payload);
 	}

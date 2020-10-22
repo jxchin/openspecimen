@@ -9,12 +9,17 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -22,11 +27,16 @@ import org.apache.commons.beanutils.BeanUtilsBean;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.krishagni.catissueplus.core.administrative.domain.PermissibleValue;
+import com.krishagni.catissueplus.core.administrative.domain.User;
 import com.krishagni.catissueplus.core.audit.services.impl.DeleteLogUtil;
 import com.krishagni.catissueplus.core.biospecimen.ConfigParams;
 import com.krishagni.catissueplus.core.biospecimen.domain.AnonymizeEvent;
@@ -34,6 +44,7 @@ import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolRegistration;
 import com.krishagni.catissueplus.core.biospecimen.domain.ConsentResponses;
+import com.krishagni.catissueplus.core.biospecimen.domain.ConsentSavedEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.ConsentTierResponse;
 import com.krishagni.catissueplus.core.biospecimen.domain.CprSavedEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.Participant;
@@ -52,6 +63,7 @@ import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolEven
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolRegistrationDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.ConsentDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CpEntityDeleteCriteria;
+import com.krishagni.catissueplus.core.biospecimen.events.CprSummary;
 import com.krishagni.catissueplus.core.biospecimen.events.FileDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.MatchedParticipant;
 import com.krishagni.catissueplus.core.biospecimen.events.MatchedParticipantsList;
@@ -62,6 +74,7 @@ import com.krishagni.catissueplus.core.biospecimen.events.RegistrationQueryCrite
 import com.krishagni.catissueplus.core.biospecimen.events.SpecimenDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.VisitDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.VisitSpecimensQueryCriteria;
+import com.krishagni.catissueplus.core.biospecimen.events.VisitSummary;
 import com.krishagni.catissueplus.core.biospecimen.repository.CprListCriteria;
 import com.krishagni.catissueplus.core.biospecimen.repository.DaoFactory;
 import com.krishagni.catissueplus.core.biospecimen.repository.VisitsListCriteria;
@@ -74,6 +87,9 @@ import com.krishagni.catissueplus.core.common.PlusTransactional;
 import com.krishagni.catissueplus.core.common.access.AccessCtrlMgr;
 import com.krishagni.catissueplus.core.common.errors.ErrorType;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityOp;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityResp;
+import com.krishagni.catissueplus.core.common.events.BulkEntityDetail;
 import com.krishagni.catissueplus.core.common.events.DependentEntityDetail;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
@@ -83,6 +99,7 @@ import com.krishagni.catissueplus.core.common.service.ObjectAccessor;
 import com.krishagni.catissueplus.core.common.service.impl.ConfigurationServiceImpl;
 import com.krishagni.catissueplus.core.common.service.impl.EventPublisher;
 import com.krishagni.catissueplus.core.common.util.AuthUtil;
+import com.krishagni.catissueplus.core.common.util.EmailUtil;
 import com.krishagni.catissueplus.core.common.util.Status;
 import com.krishagni.catissueplus.core.common.util.Utility;
 import com.krishagni.catissueplus.core.de.domain.DeObject;
@@ -112,6 +129,8 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 	private SpecimenKitService specimenKitSvc;
 
 	private ExportService exportSvc;
+
+	private ThreadPoolTaskExecutor taskExecutor;
 	
 	public void setDaoFactory(DaoFactory daoFactory) {
 		this.daoFactory = daoFactory;
@@ -153,6 +172,10 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 		this.exportSvc = exportSvc;
 	}
 
+	public void setTaskExecutor(ThreadPoolTaskExecutor taskExecutor) {
+		this.taskExecutor = taskExecutor;
+	}
+
 	@Override
 	@PlusTransactional
 	public ResponseEvent<CollectionProtocolRegistrationDetail> getRegistration(RequestEvent<RegistrationQueryCriteria> req) {				
@@ -186,9 +209,33 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 	@PlusTransactional
 	public ResponseEvent<CollectionProtocolRegistrationDetail> updateRegistration(RequestEvent<CollectionProtocolRegistrationDetail> req) {
 		try {
-			CollectionProtocolRegistrationDetail detail = req.getPayload();
-			CollectionProtocolRegistration existing = getCpr(detail.getId(), detail.getCpId(), detail.getCpShortTitle(), detail.getPpid());
-			return ResponseEvent.response(saveOrUpdateRegistration(detail, existing, true));
+			return ResponseEvent.response(updateRegistration(req.getPayload()));
+		} catch (OpenSpecimenException ose) {
+			return ResponseEvent.error(ose);
+		} catch (Exception e) {
+			return ResponseEvent.serverError(e);
+		}
+	}
+
+	@Override
+	@PlusTransactional
+	public ResponseEvent<List<CollectionProtocolRegistrationDetail>> bulkUpdateRegistrations(RequestEvent<BulkEntityDetail<CollectionProtocolRegistrationDetail>> req) {
+		try {
+			BulkEntityDetail<CollectionProtocolRegistrationDetail> buDetail = req.getPayload();
+			CollectionProtocolRegistrationDetail inputCpr = buDetail.getDetail();
+
+			List<CollectionProtocolRegistrationDetail> savedCprs = new ArrayList<>();
+			for (Long id : buDetail.getIds()) {
+				inputCpr.setId(id);
+				if (inputCpr.getParticipant() != null) {
+					inputCpr.getParticipant().setId(null);
+					inputCpr.getParticipant().setCpId(null);
+				}
+
+				savedCprs.add(updateRegistration(inputCpr));
+			}
+
+			return ResponseEvent.response(savedCprs);
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
 		} catch (Exception e) {
@@ -297,16 +344,45 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			raiseErrorIfSpecimenCentric(cpr);
 
 			AccessCtrlMgr.getInstance().ensureDeleteCprRights(cpr);
-			cpr.setOpComments(crit.getReason());
-			cpr.delete(!crit.isForceDelete(), crit.booleanParam("checkOnlyCollectedSpmns"));
-			DeleteLogUtil.getInstance().log(cpr);
+			deleteCpr(cpr, crit.getReason(), crit.isForceDelete(), crit.booleanParam("checkOnlyCollectedSpmns"));
 			return ResponseEvent.response(CollectionProtocolRegistrationDetail.from(cpr, false));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
 		} catch (Exception e) {
 			return ResponseEvent.serverError(e);
 		}
-	}	
+	}
+
+	@Override
+	@PlusTransactional
+	public ResponseEvent<BulkDeleteEntityResp<CprSummary>> deleteRegistrations(RequestEvent<BulkDeleteEntityOp> req) {
+		try {
+			BulkDeleteEntityOp crit = req.getPayload();
+
+			Set<Long> cprIds = crit.getIds();
+			List<CollectionProtocolRegistration> cprs = daoFactory.getCprDao().getByIds(cprIds);
+			if (crit.getIds().size() != cprs.size()) {
+				cprs.forEach(cpr -> cprIds.remove(cpr.getId()));
+				throw OpenSpecimenException.userError(CprErrorCode.M_NOT_FOUND, cprIds, cprIds.size());
+			}
+
+			for (CollectionProtocolRegistration cpr : cprs) {
+				AccessCtrlMgr.getInstance().ensureDeleteCprRights(cpr);
+				raiseErrorIfSpecimenCentric(cpr);
+			}
+
+			boolean completed = deleteCprs(cprs, crit.getReason(), crit.isForceDelete());
+
+			BulkDeleteEntityResp<CprSummary> resp = new BulkDeleteEntityResp<>();
+			resp.setCompleted(completed);
+			resp.setEntities(CprSummary.from(cprs, false));
+			return ResponseEvent.response(resp);
+		} catch (OpenSpecimenException ose) {
+			return ResponseEvent.error(ose);
+		} catch (Exception e) {
+			return ResponseEvent.serverError(e);
+		}
+	}
 	
 	@Override
 	@PlusTransactional
@@ -318,11 +394,8 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 				return ResponseEvent.userError(CprErrorCode.NOT_FOUND);
 			}
 			
-			boolean hasPhiAccess = AccessCtrlMgr.getInstance().ensureReadCprRights(existing);
-			if (!hasPhiAccess) {
-				return ResponseEvent.userError(RbacErrorCode.ACCESS_DENIED);
-			}
-			
+			AccessCtrlMgr.getInstance().ensureReadConsentRights(existing);
+
 			String fileName = existing.getSignedConsentDocumentName();
 			if (StringUtils.isBlank(fileName)) {
 				return ResponseEvent.userError(CprErrorCode.CONSENT_FORM_NOT_FOUND);
@@ -357,7 +430,7 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 
 			CollectionProtocolRegistration existing = getCpr(cprId, null, cpShortTitle, ppid);
 			raiseErrorIfSpecimenCentric(existing);
-			AccessCtrlMgr.getInstance().ensureUpdateCprRights(existing);
+			AccessCtrlMgr.getInstance().ensureUpdateConsentRights(existing);
 			
 			if (existing.getCollectionProtocol().isConsentsWaived()) {
 				return ResponseEvent.userError(CpErrorCode.CONSENTS_WAIVED, existing.getCollectionProtocol().getShortTitle());
@@ -398,7 +471,7 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			}
 
 			raiseErrorIfSpecimenCentric(cpr);
-			AccessCtrlMgr.getInstance().ensureUpdateCprRights(cpr);
+			AccessCtrlMgr.getInstance().ensureUpdateConsentRights(cpr);
 
 			String fileName = cpr.getSignedConsentDocumentName();
 			if (StringUtils.isBlank(fileName)) {
@@ -429,8 +502,8 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 		try {
 			RegistrationQueryCriteria crit = req.getPayload();
 			CollectionProtocolRegistration cpr = getCpr(crit.getCprId(), crit.getCpId(), crit.getPpid());
-			boolean hasPhiAccess = AccessCtrlMgr.getInstance().ensureReadCprRights(cpr);
-			return ResponseEvent.response(ConsentDetail.fromCpr(cpr, !hasPhiAccess));
+			AccessCtrlMgr.getInstance().ensureReadConsentRights(cpr);
+			return ResponseEvent.response(ConsentDetail.fromCpr(cpr));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
 		} catch (Exception e) {
@@ -447,11 +520,21 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			CollectionProtocolRegistration existing = getCpr(consentDetail.getCprId(),
 				consentDetail.getCpId(), consentDetail.getCpShortTitle(), consentDetail.getPpid());
 			raiseErrorIfSpecimenCentric(existing);
-			boolean hasPhiAccess = AccessCtrlMgr.getInstance().ensureUpdateCprRights(existing);
+
+			AccessCtrlMgr.getInstance().ensureUpdateConsentRights(existing);
 			
 			ConsentResponses consentResponses = consentResponsesFactory.createConsentResponses(existing, consentDetail);
 			existing.updateConsents(consentResponses);
-			return ResponseEvent.response(ConsentDetail.fromCpr(existing, !hasPhiAccess));
+
+			Map<String, String> responses = consentResponses.getConsentResponses().stream()
+				.filter(r -> r.getResponse() != null)
+				.collect(Collectors.toMap(
+					ConsentTierResponse::getStatementCode,
+					r -> r.getResponse().getValue()
+				));
+			EventPublisher.getInstance().publish(new ConsentSavedEvent(existing, responses));
+
+			return ResponseEvent.response(ConsentDetail.fromCpr(existing));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
 		} catch (Exception e) {
@@ -499,7 +582,8 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			List<VisitDetail> result = new ArrayList<>(visitsMap.values());
 			result.addAll(anticipatedVisitsMap.values());
 			VisitDetail.setAnticipatedVisitDates(cpr.getRegistrationDate(), result);
-			Collections.sort(result);
+
+			result.sort(crit.sortByDates() ? VisitSummary::compareDates : VisitSummary::compareTo);
 			return ResponseEvent.response(result);
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
@@ -583,7 +667,7 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			return ResponseEvent.serverError(e);
 		}
 	}
-	
+
 	@Override
 	public String getObjectName() {
 		return CollectionProtocolRegistration.getEntityName();
@@ -613,6 +697,11 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 	public void afterPropertiesSet() throws Exception {
 		exportSvc.registerObjectsGenerator("cpr", this::getCprsGenerator);
 		exportSvc.registerObjectsGenerator("consent", this::getConsentsGenerator);
+	}
+
+	private CollectionProtocolRegistrationDetail updateRegistration(CollectionProtocolRegistrationDetail input) {
+		CollectionProtocolRegistration existing = getCpr(input.getId(), input.getCpId(), input.getCpShortTitle(), input.getPpid());
+		return saveOrUpdateRegistration(input, existing, true);
 	}
 
 	private CollectionProtocolRegistrationDetail saveOrUpdateRegistration(
@@ -1056,6 +1145,17 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 		return cpr;
 	}
 
+	private List<CollectionProtocolRegistration> getRegistrations(String cpShortTitle, List<String> ppids) {
+		List<CollectionProtocolRegistration> regs = daoFactory.getCprDao().getByPpids(cpShortTitle, ppids);
+		if (regs.size() != ppids.size()) {
+			List<String> notFoundPpids = new ArrayList<>(ppids);
+			regs.forEach(reg -> notFoundPpids.remove(reg.getPpid()));
+			throw OpenSpecimenException.userError(CprErrorCode.M_NOT_FOUND, notFoundPpids, notFoundPpids.size());
+		}
+
+		return regs;
+	}
+
 	private void checkDistributedSpecimens(List<SpecimenDetail> specimens) {
 		List<Long> specimenIds = getSpecimenIds(specimens);
 		if (CollectionUtils.isEmpty(specimenIds)) {
@@ -1160,7 +1260,6 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			}
 		}
 
-		boolean checkPermission = true;
 		for (CollectionProtocolEvent cpe : cpes) {
 			if (cpe.isClosed()) {
 				continue;
@@ -1189,8 +1288,7 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 			cal.add(Calendar.DATE, interval);
 			visitDetail.setVisitDate(cal.getTime());
 
-			cpr.addVisit(visitSvc.addVisit(visitDetail, checkPermission));
-			checkPermission = false;
+			cpr.addVisit(visitSvc.addVisit(visitDetail, false));
 		}
 	}
 
@@ -1215,6 +1313,86 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 		}
 
 		return cpId;
+	}
+
+	private boolean deleteCprs(List<CollectionProtocolRegistration> cprs, String reason, boolean forceDelete)
+	throws Exception {
+		final Authentication auth = AuthUtil.getAuth();
+
+		Future<Boolean> result = taskExecutor.submit(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				try {
+					SecurityContextHolder.getContext().setAuthentication(auth);
+
+					List<CollectionProtocolRegistration> success = new ArrayList<>();
+					Map<CollectionProtocolRegistration, String> failed = new HashMap<>();
+
+					for (CollectionProtocolRegistration cpr : cprs) {
+						try {
+							deleteCpr(cpr.getId(), reason, forceDelete);
+							success.add(cpr);
+						} catch (Throwable t) {
+							failed.put(cpr, ExceptionUtils.getStackTrace(t));
+						}
+					}
+
+					notifyOnCprsDeleted(AuthUtil.getCurrentUser(), success);
+					notifyOnCprsDeleteErrors(AuthUtil.getCurrentUser(), failed);
+				} catch (Throwable t) {
+					logger.error("Error deleting registrations", t);
+				}
+
+				return true;
+			}
+		});
+
+		boolean completed = false;
+		try {
+			completed = result.get(30, TimeUnit.SECONDS);
+		} catch (TimeoutException ex) {
+			completed = false;
+		}
+
+		return completed;
+	}
+
+	@PlusTransactional
+	private void deleteCpr(Long cprId, String reason, boolean forceDelete) {
+		CollectionProtocolRegistration cpr = daoFactory.getCprDao().getById(cprId);
+		deleteCpr(cpr, reason, forceDelete, true);
+	}
+
+	private void deleteCpr(CollectionProtocolRegistration cpr, String reason, boolean forceDelete, boolean checkOnlyCollectedSpmns) {
+		cpr.setOpComments(reason);
+		cpr.delete(!forceDelete, checkOnlyCollectedSpmns);
+		DeleteLogUtil.getInstance().log(cpr);
+	}
+
+	private void notifyOnCprsDeleted(User user, List<CollectionProtocolRegistration> cprs) {
+		if (cprs == null || cprs.isEmpty()) {
+			return;
+		}
+
+		String[] rcpts = { user.getEmailAddress() };
+		Map<String, Object> props = new HashMap<>();
+		props.put("rcpt", user);
+		props.put("cprs", cprs);
+		props.put("ccAdmin", false);
+		EmailUtil.getInstance().sendEmail("cprs_delete_success", rcpts, null, props);
+	}
+
+	private void notifyOnCprsDeleteErrors(User user, Map<CollectionProtocolRegistration, String> errors) {
+		if (errors == null || errors.isEmpty()) {
+			return;
+		}
+
+		String[] rcpts = { user.getEmailAddress() };
+		Map<String, Object> props = new HashMap<>();
+		props.put("rcpt", user);
+		props.put("ccAdmin", false);
+		props.put("errors", errors);
+		EmailUtil.getInstance().sendEmail("cprs_delete_error", rcpts, null, props);
 	}
 
 	private abstract class AbstractCprsGenerator implements Function<ExportJob, List<? extends Object>> {
@@ -1313,6 +1491,21 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 
 	private Function<ExportJob, List<? extends Object>> getConsentsGenerator() {
 		return new AbstractCprsGenerator() {
+			//
+			// -1: error, 0: full access, 1: access without PHI
+			//
+			int canRead(CollectionProtocolRegistration cpr) {
+				try {
+					return AccessCtrlMgr.getInstance().ensureReadConsentRights(cpr) ? 0 : 1;
+				} catch (OpenSpecimenException ose) {
+					if (!ose.containsError(RbacErrorCode.ACCESS_DENIED)) {
+						logger.error("Error checking participant record access", ose);
+					}
+
+					return -1;
+				}
+			}
+
 			@Override
 			public List<? extends Object> apply(ExportJob job) {
 				List<ConsentDetail> records = new ArrayList<>();
@@ -1341,6 +1534,7 @@ public class CollectionProtocolRegistrationServiceImpl implements CollectionProt
 							}
 
 							detail.setStatement(resp.getStatement());
+							detail.setCode(resp.getStatementCode());
 							detail.setResponse(PermissibleValue.getValue(resp.getResponse()));
 							firstResp = false;
 						}

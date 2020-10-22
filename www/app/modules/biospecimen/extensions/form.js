@@ -54,8 +54,10 @@ angular.module('os.biospecimen.extensions', ['os.biospecimen.models'])
           var baseUrl = Form.url();
           var filesUrl = ApiUrls.getBaseUrl() + 'form-files';
           var hdrs = {
-            'X-OS-API-TOKEN': $http.defaults.headers.common['X-OS-API-TOKEN']
+            'X-OS-API-TOKEN': $http.defaults.headers.common['X-OS-API-TOKEN'],
+            'X-OS-SURVEY-TOKEN': $http.defaults.headers.common['X-OS-SURVEY-TOKEN']
           };
+
           var args = {
             id             : opts.formId,
             formDiv        : element,
@@ -86,15 +88,11 @@ angular.module('os.biospecimen.extensions', ['os.biospecimen.models'])
             disableFields  : opts.disableFields || []
           };
 
-          SettingUtil.getSetting('common', 'de_form_html_markup').then(
-            function(setting) {
-              args.allowHtmlCaptions = setting.value;
-              ctrl.form = new edu.common.de.Form(args);
-              ctrl.form.render();
-              LocationChangeListener.preventChange();
-              addWatchForDomChanges(opts);
-            }
-          );
+          args.allowHtmlCaptions = ui.os.appProps.allowHtmlMarkup;
+          ctrl.form = new edu.common.de.Form(args);
+          ctrl.form.render();
+          LocationChangeListener.preventChange();
+          addWatchForDomChanges(opts);
 
           onceRendered = true;
         }, true);
@@ -145,6 +143,8 @@ angular.module('os.biospecimen.extensions', ['os.biospecimen.models'])
               angular.element(this).addClass("col-xs-offset-3 col-xs-8");
             }
           );
+
+          element.find('.de-sf-content').closest('.col-xs-6').removeClass('col-xs-6').addClass('col-xs-9');
         }
       }
     }

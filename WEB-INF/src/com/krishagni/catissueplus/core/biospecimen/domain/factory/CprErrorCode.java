@@ -4,6 +4,8 @@ import com.krishagni.catissueplus.core.common.errors.ErrorCode;
 
 public enum CprErrorCode implements ErrorCode {
 	NOT_FOUND,
+
+	M_NOT_FOUND,
 	
 	INVALID_CP_AND_PPID,
 	
@@ -41,8 +43,16 @@ public enum CprErrorCode implements ErrorCode {
 
 	COLLECTION_SITE_REQUIRED,
 
-	NOT_CP_SITE;
-	
+	NOT_CP_SITE,
+
+	MUL_REGS_FOR_PMIS,
+
+	CP_CLOSED,
+
+	NO_EMAIL_IDS,
+
+	INVALID_FORM_TYPE;
+
 	@Override
 	public String code() {
 		return "CPR_" + this.name();

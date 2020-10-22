@@ -106,9 +106,11 @@
         com.krishagni.catissueplus.core.administrative.domain.DistributionProtocol dp
         join dp.distributionOrders do
         join do.orderItems orderItem
+        join orderItem.specimen spmn
       where
         dp.id in (:dpIds) and
-        do.status = 'EXECUTED'
+        do.status = 'EXECUTED' and
+        spmn.activityStatus != 'Disabled'
       group by
         dp.id
     </query>
@@ -143,12 +145,13 @@
             inner join catissue_consent_tier_response resp on resp.coll_prot_reg_id = reg.identifier
             inner join catissue_consent_tier cp_ct on cp_ct.identifier = resp.consent_tier_id
             inner join os_dp_consent_tiers dp_ct on dp_ct.consent_stmt_id = cp_ct.consent_stmt_id
+            inner join catissue_permissible_value resp_pv on resp_pv.identifier = resp.response_id
           where
             s.identifier in (:specimenIds) and
             dp_ct.dp_id = :dpId and
             dp_ct.activity_status = 'Active' and
             cp_ct.activity_status = 'Active' and
-            resp.response = 'Yes'
+            resp_pv.value = 'Yes'
           group by
             s.identifier
           having

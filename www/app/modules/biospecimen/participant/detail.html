@@ -47,7 +47,7 @@
           <span class="os-title" translate="participant.menu.overview">Overview</span>
         </a>
       </li>
-      <li ui-sref-active="active" ng-if="!cp.consentsWaived">
+      <li ui-sref-active="active" ng-if="!cp.consentsWaived && cpViewCtx.consentsReadAllowed">
         <a ui-sref=".consents">
           <span class="fa fa-pencil-square-o"></span>
           <span class="os-title" translate="participant.menu.consents">Consents</span>
@@ -77,6 +77,7 @@
           <span class="os-title" translate="participant.menu.specimen_tree">Specimen Tree</span>
         </a>
       </li>
+      <os-plugin-hooks view-name="'participant-detail'" sec-name="'side-menu'"></os-plugin-hooks>
     </ul>
   </div>
 

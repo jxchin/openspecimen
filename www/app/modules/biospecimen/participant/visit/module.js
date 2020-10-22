@@ -93,7 +93,11 @@ angular.module('os.biospecimen.visit', [
         url: '/detail',
         templateUrl: 'modules/biospecimen/participant/visit/detail.html',
         resolve: {
-          specimens: function(cpr, visit, Specimen) {
+          specimens: function(cpr, visit, cpViewCtx, Specimen) {
+            if (!cpViewCtx.spmnReadAllowed) {
+              return [];
+            }
+
             var criteria = { visitId: visit.id, eventId: visit.eventId };
             return Specimen.listFor(cpr.id, criteria);
           }
@@ -111,8 +115,8 @@ angular.module('os.biospecimen.visit', [
             }
           );
         },
-        controller: function($scope, cpr, hasFieldsFn, showVisitActivity, spmnReqs, osRightDrawerSvc, ExtensionsUtil) {
-          ExtensionsUtil.createExtensionFieldMap($scope.visit);
+        controller: function($scope, cpr, hasFieldsFn, showVisitActivity, spmnReqs, hasDict, osRightDrawerSvc, ExtensionsUtil) {
+          ExtensionsUtil.createExtensionFieldMap($scope.visit, hasDict);
           $scope.visitCtx = {
             obj: {cpr: cpr, visit: $scope.visit},
             spmnReqs: spmnReqs,
@@ -127,6 +131,18 @@ angular.module('os.biospecimen.visit', [
 
           $scope.toggleShowActivity = function() {
             $scope.visitCtx.showActivity = !$scope.visitCtx.showActivity;
+          }
+
+          $scope.joinCd = function(cd) {
+            if (cd.value == 'Not Specified') {
+              return null;
+            }
+
+            if (cd.conceptCode) {
+              return cd.value + ' (' + cd.conceptCode + ')';
+            } else {
+              return cd.value;
+            }
           }
         },
         resolve: {
@@ -143,12 +159,24 @@ angular.module('os.biospecimen.visit', [
       .state('visit-detail.extensions', {
         url: '/extensions',
         template: '<div ui-view></div>',
-        controller: function($scope, visit, forms, records, ExtensionsUtil) {
+        controller: function($scope, visit, forms, surveys, records, ExtensionsUtil) {
           $scope.extnOpts = {
-            update: $scope.specimenResource.updateOpts,
+            update: $scope.visitResource.updateOpts,
             entity: visit,
             isEntityActive: visit.activityStatus == 'Active'
           }
+
+          angular.forEach(surveys,
+            function(survey) {
+              for (var j = 0; j < forms.length; ++j) {
+                var form = forms[j];
+                if (form.formCtxtId == survey.formCtxtId) {
+                  form.survey = survey;
+                  break;
+                }
+              }
+            }
+          );
 
           ExtensionsUtil.linkFormRecords(forms, records);
         },
@@ -160,15 +188,27 @@ angular.module('os.biospecimen.visit', [
               }
             );
           },
-          forms: function(visit, orderSpec, ExtensionsUtil) {
+          fdeRules: function(cp, CpConfigSvc) {
+            return CpConfigSvc.getWorkflowData(cp.id, 'formDataEntryRules', {}).then(
+              function(wf) {
+                return wf['visit'] || [];
+              }
+            );
+          },
+          forms: function(cp, cpr, visit, currentUser, orderSpec, fdeRules, ExtensionsUtil) {
             return visit.getForms().then(
               function(forms) {
+                var ctxt = {cp: cp, cpr: cpr, visit: visit, user: currentUser};
+                forms = ExtensionsUtil.getMatchingForms(forms, fdeRules, ctxt);
                 return ExtensionsUtil.sortForms(forms, orderSpec);
               } 
             ) 
           },
           records: function(visit) {
             return visit.getRecords();
+          },
+          surveys: function(cpViewCtx) {
+            return cpViewCtx.getSurveys();
           },
           viewOpts: function() {
             return {

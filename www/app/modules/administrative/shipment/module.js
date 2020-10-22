@@ -61,7 +61,7 @@ angular.module('os.administrative.shipment',
           },
 
           isEditAllowed: function(shipment, Util) {
-            var editAllowed = !shipment.status || shipment.status == 'Pending';
+            var editAllowed = !shipment.status || shipment.status == 'Pending' || shipment.status == 'Shipped';
             return Util.booleanPromise(editAllowed);
           }
         },
@@ -79,7 +79,7 @@ angular.module('os.administrative.shipment',
               objectType: ($stateParams.type || 'shipment'),
               csvType: 'MULTIPLE_ROWS_PER_OBJ',
               title: 'shipments.bulk_import',
-              onSuccess: {state: 'shipment-list'}
+              onSuccess: {state: 'shipment-import-jobs'}
             };
           }
         },
@@ -137,7 +137,7 @@ angular.module('os.administrative.shipment',
           },
           
           isReceiveAllowed: function(shipment, Util) {
-            return Util.booleanPromise(shipment.status == 'Shipped');
+            return Util.booleanPromise(shipment.status == 'Shipped' || shipment.status == 'Received');
           },
 
           shipmentItems: function(isReceiveAllowed, shipment) {

@@ -113,7 +113,12 @@ angular.module('os.query.addeditfilter', ['os.query.models'])
       //
       var selectField = '$temporal.' + filter.id;
       for (var i = 0; i < ql.selectedFields.length; ++i) { 
-        if (ql.selectedFields[i] == selectField) {
+        var field = ql.selectedFields[i];
+        if (typeof field != 'string' && field) {
+          field = field.name;
+        }
+
+        if (field == selectField) {
           ql.selectedFields.splice(i, 1);
           break;
         }
@@ -174,6 +179,7 @@ angular.module('os.query.addeditfilter', ['os.query.models'])
             form.getFields().then(
               function() {
                 var fieldsAdvise = QueryUtil.getFieldsAdvise(form);
+                fieldsAdvise.push({label: fieldName, value: fieldName});
                 response($scope.temporalFilterOpts.methods.filter(fieldsAdvise, fieldName));
               }
             );

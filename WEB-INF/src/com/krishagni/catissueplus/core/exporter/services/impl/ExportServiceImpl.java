@@ -11,6 +11,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
@@ -31,6 +32,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import com.krishagni.catissueplus.core.administrative.domain.User;
 import com.krishagni.catissueplus.core.common.Pair;
 import com.krishagni.catissueplus.core.common.PlusTransactional;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
@@ -119,7 +121,7 @@ public class ExportServiceImpl implements ExportService {
 	}
 
 	@Override
-	public void registerObjectsGenerator(String type, Supplier<Function<ExportJob, List<? extends Object>>> genFactory) {
+	public void registerObjectsGenerator(String type, Supplier<Function<ExportJob, List<?>>> genFactory) {
 		genFactories.put(type, genFactory);
 	}
 
@@ -129,7 +131,12 @@ public class ExportServiceImpl implements ExportService {
 
 		Future<Integer> result;
 		if (detail.isSynchronous()) {
-			result = CompletableFuture.completedFuture(task.call());
+			User currentUser = AuthUtil.getCurrentUser();
+			try {
+				result = CompletableFuture.completedFuture(task.call());
+			} finally {
+				AuthUtil.setCurrentUser(currentUser);
+			}
 		} else {
 			result = taskExecutor.submit(task);
 		}
@@ -149,16 +156,27 @@ public class ExportServiceImpl implements ExportService {
 			throw  OpenSpecimenException.userError(ExportErrorCode.NO_GEN_FOR_OBJECT_TYPE, detail.getObjectType());
 		}
 
+		TimeZone tz = AuthUtil.getUserTimeZone();
 		ExportJob job = new ExportJob();
 		job.setName(detail.getObjectType());
 		job.setCreatedBy(AuthUtil.getCurrentUser());
 		job.setCreationTime(Calendar.getInstance().getTime());
-		job.setParams(detail.getParams());
+		job.setParams(getParams(detail.getParams()));
 		job.setSchema(schema);
 		job.setRecordIds(detail.getRecordIds());
 		job.setDisableNotifs(detail.isDisableNotifs());
+		job.param("timeZone", tz != null ? tz.getID() : null);
 		exportJobDao.saveOrUpdate(job.markInProgress(), true);
 		return job;
+	}
+
+	private Map<String, String> getParams(Map<String, String> params) {
+		Map<String, String> result = new HashMap<>();
+		if (params != null) {
+			result.putAll(params);
+		}
+
+		return result;
 	}
 
 	private class ExportTask implements Callable<Integer> {
@@ -178,17 +196,30 @@ public class ExportServiceImpl implements ExportService {
 
 		private long filesCount = 0;
 
-		private SimpleDateFormat df;
+		private SimpleDateFormat dateOnlyFormatter;
 
-		private SimpleDateFormat tf;
+		private SimpleDateFormat dateFormatter;
+
+		private SimpleDateFormat dateTimeFormatter;
 
 		ExportTask(ExportJob inputJob) {
 			job = inputJob;
 			generator = genFactories.get(job.getName()).get();
 
+			String timeZoneStr = inputJob.param("timeZone");
 			String dateFmt = ConfigUtil.getInstance().getDeDateFmt();
-			df = new SimpleDateFormat(dateFmt);
-			tf = new SimpleDateFormat(dateFmt + " " + ConfigUtil.getInstance().getTimeFmt());
+			dateOnlyFormatter = new SimpleDateFormat(dateFmt);
+			dateFormatter = new SimpleDateFormat(dateFmt);
+			dateTimeFormatter = new SimpleDateFormat(dateFmt + " " + ConfigUtil.getInstance().getTimeFmt());
+			if (StringUtils.isNotBlank(timeZoneStr)) {
+				try {
+					TimeZone tz = TimeZone.getTimeZone(timeZoneStr);
+					dateFormatter.setTimeZone(tz);
+					dateTimeFormatter.setTimeZone(tz);
+				} catch (Exception e) {
+					logger.error("Error using the timezone: " + timeZoneStr, e);
+				}
+			}
 		}
 
 
@@ -272,7 +303,8 @@ public class ExportServiceImpl implements ExportService {
 					updateFieldCount(namePrefix + field.getAttribute(), count);
 				} else {
 					String value = getString(object, field);
-					if (("file".equals(field.getType()) || "defile".equals(field.getType())) && StringUtils.isNotBlank(value)) {
+					if (StringUtils.isNotBlank(value) &&
+						("file".equals(field.getType()) || "defile".equals(field.getType()) || "signature".equals(field.getType()))) {
 						value = ++filesCount + "_" + value;
 						writeFileData(object, field, value);
 					}
@@ -330,6 +362,9 @@ public class ExportServiceImpl implements ExportService {
 				} else if (field.getType().equals("defile")) {
 					Map<String, String> fcv = (Map<String, String>) getObject(object, field.getAttribute());
 					String fileId = fcv.get("fileId");
+					srcFile = new File(DeConfiguration.getInstance().fileUploadDir(), fileId);
+				} else if (field.getType().equals("signature")) {
+					String fileId = (String) getObject(object, field.getAttribute());
 					srcFile = new File(DeConfiguration.getInstance().fileUploadDir(), fileId);
 				}
 
@@ -509,7 +544,9 @@ public class ExportServiceImpl implements ExportService {
 				String result;
 
 				Object value = getObject(object, field.getAttribute());
-				if ("date".equals(field.getType())) {
+				if ("dateOnly".equals(field.getType())) {
+					result = getDateOnlyString(value);
+				} else if ("date".equals(field.getType())) {
 					result = getDateString(value);
 				} else if ("datetime".equals(field.getType())) {
 					result = getDateTimeString(value);
@@ -552,12 +589,16 @@ public class ExportServiceImpl implements ExportService {
 			}
 		}
 
+		private String getDateOnlyString(Object input) {
+			return getFormattedDateTimeString(dateOnlyFormatter, input);
+		}
+
 		private String getDateString(Object input) {
-			return getFormattedDateTimeString(df, input);
+			return getFormattedDateTimeString(dateFormatter, input);
 		}
 
 		private String getDateTimeString(Object input) {
-			return getFormattedDateTimeString(tf, input);
+			return getFormattedDateTimeString(dateTimeFormatter, input);
 		}
 
 		private String getFormattedDateTimeString(SimpleDateFormat formatter, Object input) {

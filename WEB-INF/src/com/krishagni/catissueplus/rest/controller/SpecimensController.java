@@ -141,6 +141,30 @@ public class SpecimensController {
 			return Collections.emptyList();
 		}
 	}
+
+	@RequestMapping(method = RequestMethod.POST, value = "/search")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public List<? extends SpecimenInfo> getSpecimens(@RequestBody SpecimenListCriteria crit) {
+		int size = 0;
+		if (crit.labels() != null) {
+			size += crit.labels().size();
+		}
+
+		if (crit.barcodes() != null) {
+			size += crit.barcodes().size();
+		}
+
+		if (size > 10000) {
+			throw OpenSpecimenException.userError(SpecimenErrorCode.LABELS_SRCH_LIMIT_MAXED, 1000);
+		}
+
+		if (crit.maxResults() > 10000) {
+			crit.maxResults(10000);
+		}
+
+		return ResponseEvent.unwrap(specimenSvc.getSpecimens(RequestEvent.wrap(crit.limitItems(true))));
+	}
 	
 	@RequestMapping(method = RequestMethod.GET, value = "/{id}")
 	@ResponseStatus(HttpStatus.OK)

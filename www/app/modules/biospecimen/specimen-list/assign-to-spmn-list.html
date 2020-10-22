@@ -8,7 +8,7 @@
   </button>
   
   <ul class="dropdown-menu os-query-folders-dd" ng-class="{'dropdown-menu-right': !leftAlign}">
-    <li>
+    <li class="os-no-label-form">
       <input ng-model="filterOpts.name" type="text" class="form-control"
         placeholder="{{'specimen_list.search_list' | translate}}" ng-click="$event.stopPropagation()">
     </li>
@@ -22,6 +22,11 @@
       </ul>
     </li>
     <li class="divider"></li>
+    <li>
+      <a ui-sref="specimen-list({listId: 0})">
+        <span translate="specimen_list.view_default_list">Default Cart</span>
+      </a>
+    </li>
     <li>
       <a ng-click="addToList()">
         <span translate="specimen_list.create_new_list">Create New</span>

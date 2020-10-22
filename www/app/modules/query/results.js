@@ -88,6 +88,14 @@ angular.module('os.query.results', ['os.query.models'])
         counters: {waiting: true, error: false},
       }
 
+      $scope.$on('ngGridEventDigestGridParent',
+        function() {
+          /* Patented idea.
+             This is to trigger a digest cycle when user changes the selection by
+             using up and down arrow keys. */
+          $timeout(function() { }, 0);
+        }
+      );
       executeQuery($stateParams.editMode);
     }
 
@@ -156,13 +164,13 @@ angular.module('os.query.results', ['os.query.models'])
       var qc = $scope.queryCtx;
       $scope.showAddToSpecimenList = showAddToSpecimenList();
       $scope.resultsCtx.waitingForRecords = true;
-      $scope.resultsCtx.error = false;
+      $scope.resultsCtx.error = $scope.resultsCtx.moreData = false;
 
       currResults = {};
 
       var aql = getAql(true, true);
       var outputIsoFmt = (qc.reporting.type != 'crosstab');
-      var opts = {outputColumnExprs: qc.outputColumnExprs};
+      var opts = {outputColumnExprs: qc.outputColumnExprs, caseSensitive: qc.caseSensitive};
       QueryExecutor.getRecords(qc.id, qc.selectedCp, aql, qc.wideRowMode || 'DEEP', outputIsoFmt, opts).then(
         function(result) {
           currResults = result;
@@ -364,7 +372,7 @@ angular.module('os.query.results', ['os.query.models'])
       var counters = $scope.resultsCtx.counters;
       counters.waiting = true;
       counters.error = false;
-      QueryExecutor.getCount(qc.id, qc.selectedCp, aql).then(
+      QueryExecutor.getCount(qc.id, qc.selectedCp, aql, qc.caseSensitive).then(
         function(result) {
           counters.waiting = false;
           angular.extend(counters, result);
@@ -414,6 +422,7 @@ angular.module('os.query.results', ['os.query.models'])
     function preparePivotTable(result) {
       $scope.resultsCtx.rows = result.rows;
       $scope.resultsCtx.columnLabels = result.columnLabels;
+      $scope.resultsCtx.moreData = (result.dbRowsCount >= 10000);
 
       var numGrpCols = $scope.queryCtx.reporting.params.groupRowsBy.length;
       for (var i = 0; i < numGrpCols; ++i) {
@@ -468,25 +477,33 @@ angular.module('os.query.results', ['os.query.models'])
           var columnLabel = removeSeparator(columnLabel);
           var width = getColumnWidth(columnLabel);
 
+          var isDateColumn = (result.columnTypes[idx] == 'DATE');
           var cellTemplate = null;
           if (result.columnUrls[idx]) {
             var link, linkTxt;
             if (result.columnUrls[idx] == 'true') {
-              link = '{{row.getProperty(col.field)}}';
+              link = '{{row.entity[col.field]}}';
               linkTxt = 'Click here';
             } else {
               link = '{{cellUrl(row, col,' + idx + ')}}'
-              linkTxt = '{{row.getProperty(col.field)}}';
+              linkTxt = '{{row.entity[col.field]}}';
             }
 
-            cellTemplate = '<div class="ngCellText" ng-class="col.colIndex()">' +
+            cellTemplate = '<div class="ngCellText" ng-class="col.colIndex()" title="' + linkTxt + '">' +
                            '  <a href="' + link + '" target="_blank">' +
                                 linkTxt +
                            '  </a>' +
                            '</div>';
+          } else if (isDateColumn) {
+            cellTemplate = '<div class="ngCellText" ng-class="col.colIndex()" title="{{row.entity[col.field]}}">' +
+                           '  <span>{{row.entity[col.field] | osQueryDate}}</span>' +
+                           '</div>';
+          } else {
+            cellTemplate = '<div class="ngCellText" ng-class="col.colIndex()" title="{{row.entity[col.field]}}">' +
+                           '  <span>{{row.entity[col.field]}}</span>' +
+                           '</div>';
           }
 
-          var isDateColumn = (result.columnTypes[idx] == 'DATE');
           colDefs.push({
             field:        "col" + idx,
             instance:     columnInstance(columnLabel).instance,
@@ -497,7 +514,7 @@ angular.module('os.query.results', ['os.query.models'])
             showSummary:  showColSummary,
             summary:      summaryRow[idx],
             sortFn:       getSortFn(result.columnTypes[idx]),
-            cellFilter:   isDateColumn ? "osQueryDate" : undefined
+            cellFilter:   isDateColumn ? "osQueryDate" : undefined /* unused */
           });
         }
       );
@@ -534,7 +551,7 @@ angular.module('os.query.results', ['os.query.models'])
       var formattedRows = [];
       for (var i = 0; i < rows.length; ++i) {
         var formattedRow = {hidden:{}};
-        for (var j = 0; j < rows[i].length; ++j) {
+        for (var j = 0; j < rows[i].length && j < labels.length; ++j) {
           if (labels[j].charAt(0) == '$') {
             var colInstance = columnInstance(labels[j]);
             if (!formattedRow['hidden'][colInstance.instance]) {
@@ -575,7 +592,7 @@ angular.module('os.query.results', ['os.query.models'])
 
     function getSelectedSpecimens() {
       return $scope.selectedRows.map(function(row) {
-        return {id: row.hidden[0].$specimenId};
+        return {id: row.hidden[0].$specimenId, cpId: row.hidden[0].$cpId};
       });
     };
 
@@ -625,6 +642,7 @@ angular.module('os.query.results', ['os.query.models'])
     }
 
     $scope.defineView = function() {
+      var prevCaseSensitive = $scope.queryCtx.caseSensitive;
       var mi = $modal.open({
         templateUrl: 'modules/query/define-view.html',
         controller: 'DefineViewCtrl',
@@ -640,7 +658,7 @@ angular.module('os.query.results', ['os.query.models'])
         function(queryCtx) {
           $scope.queryCtx = queryCtx;
           QueryUtil.disableCpSelection(queryCtx);
-          loadRecords(false, false);
+          loadRecords(false, (prevCaseSensitive != queryCtx.caseSensitive));
         }
       );
     }
@@ -659,7 +677,7 @@ angular.module('os.query.results', ['os.query.models'])
 
       var alert = Alerts.info('queries.export_initiated', {}, false);  
       var aql = getAql(false);
-      var opts = {outputColumnExprs: qc.outputColumnExprs};
+      var opts = {outputColumnExprs: qc.outputColumnExprs, caseSensitive: qc.caseSensitive};
       QueryExecutor.exportQueryResultsData(qc.id, qc.selectedCp, aql, qc.wideRowMode || 'DEEP', opts).then(
         function(result) {
           Alerts.remove(alert);

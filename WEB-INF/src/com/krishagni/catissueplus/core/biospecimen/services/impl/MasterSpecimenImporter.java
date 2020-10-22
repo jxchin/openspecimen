@@ -1,5 +1,8 @@
 package com.krishagni.catissueplus.core.biospecimen.services.impl;
 
+import java.util.List;
+
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.springframework.beans.BeanUtils;
@@ -11,11 +14,13 @@ import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolRegi
 import com.krishagni.catissueplus.core.biospecimen.domain.Specimen;
 import com.krishagni.catissueplus.core.biospecimen.domain.Visit;
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.CpErrorCode;
+import com.krishagni.catissueplus.core.biospecimen.domain.factory.CprErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.SpecimenErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionEventDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolRegistrationDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.MasterSpecimenDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.ParticipantDetail;
+import com.krishagni.catissueplus.core.biospecimen.events.PmiDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.ReceivedEventDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.SpecimenDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.VisitDetail;
@@ -29,6 +34,7 @@ import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
 import com.krishagni.catissueplus.core.common.events.UserSummary;
 import com.krishagni.catissueplus.core.common.util.AuthUtil;
+import com.krishagni.catissueplus.core.de.services.impl.ExtensionsUtil;
 import com.krishagni.catissueplus.core.importer.events.ImportObjectDetail;
 import com.krishagni.catissueplus.core.importer.services.ObjectImporter;
 
@@ -70,6 +76,8 @@ public class MasterSpecimenImporter implements ObjectImporter<MasterSpecimenDeta
 			
 			createCpr(detail.getObject());
 			createVisit(detail.getObject());
+
+			ExtensionsUtil.initFileFields(detail.getUploadedFilesDir(), detail.getObject().getExtensionDetail());
 			createSpecimen(detail.getObject());
 			
 			return ResponseEvent.response(detail.getObject());
@@ -96,6 +104,10 @@ public class MasterSpecimenImporter implements ObjectImporter<MasterSpecimenDeta
 		CollectionProtocolRegistration cpr = null;
 		if (StringUtils.isNotBlank(detail.getPpid())) {
 			cpr = daoFactory.getCprDao().getCprByCpShortTitleAndPpid(detail.getCpShortTitle(), detail.getPpid());
+		} else if (StringUtils.isNotBlank(detail.getEmpi())) {
+			cpr = daoFactory.getCprDao().getCprByCpShortTitleAndEmpi(detail.getCpShortTitle(), detail.getEmpi());
+		} else if (CollectionUtils.isNotEmpty(detail.getPmis())) {
+			cpr = getCprByPmis(detail.getCpShortTitle(), detail.getPmis());
 		}
 
 		if (cpr != null) {
@@ -108,6 +120,7 @@ public class MasterSpecimenImporter implements ObjectImporter<MasterSpecimenDeta
 				detail.setVisitId(matchedVisit.getId());
 			}
 
+			detail.setPpid(cpr.getPpid());
 			return;
 		}
 
@@ -123,6 +136,15 @@ public class MasterSpecimenImporter implements ObjectImporter<MasterSpecimenDeta
 		resp.throwErrorIfUnsuccessful();
 		
 		detail.setPpid(resp.getPayload().getPpid());
+	}
+
+	private CollectionProtocolRegistration getCprByPmis(String cpShortTitle, List<PmiDetail> pmis) {
+		List<CollectionProtocolRegistration> cprs = daoFactory.getCprDao().getCprsByCpShortTitleAndPmis(cpShortTitle, pmis);
+		if (cprs.size() > 1) {
+			throw OpenSpecimenException.userError(CprErrorCode.MUL_REGS_FOR_PMIS);
+		}
+
+		return cprs.isEmpty() ? null : cprs.iterator().next();
 	}
 
 	private boolean isVisitOfSameEvent(Visit visit, String eventLabel) {
@@ -182,7 +204,7 @@ public class MasterSpecimenImporter implements ObjectImporter<MasterSpecimenDeta
 		setLocation(detail, specimenDetail);
 		setCollectionDetail(detail, specimenDetail);
 		setReceiveDetail(detail, specimenDetail);
-		
+
 		ResponseEvent<SpecimenDetail> resp = specimenSvc.createSpecimen(request(specimenDetail));
 		resp.throwErrorIfUnsuccessful();
 		

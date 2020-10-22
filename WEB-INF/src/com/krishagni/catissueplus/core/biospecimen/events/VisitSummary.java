@@ -5,7 +5,6 @@ import java.util.Calendar;
 import java.util.Date;
 
 import org.apache.commons.lang3.ObjectUtils;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 import com.krishagni.catissueplus.core.common.AttributeModifiedSupport;
 import com.krishagni.catissueplus.core.common.ListenAttributeChanges;
@@ -13,7 +12,6 @@ import com.krishagni.catissueplus.core.common.domain.IntervalUnit;
 import com.krishagni.catissueplus.core.common.events.UserSummary;
 import com.krishagni.catissueplus.core.common.util.Utility;
 
-@JsonSerialize(include= JsonSerialize.Inclusion.NON_NULL)
 @ListenAttributeChanges
 public class VisitSummary extends AttributeModifiedSupport implements Comparable<VisitSummary> {
 	private Long id;
@@ -23,7 +21,9 @@ public class VisitSummary extends AttributeModifiedSupport implements Comparable
 	private Long eventId;
 
 	private String name;
-	
+
+	private String eventCode;
+
 	private String eventLabel;
 	
 	private Integer eventPoint;
@@ -88,6 +88,14 @@ public class VisitSummary extends AttributeModifiedSupport implements Comparable
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	public String getEventCode() {
+		return eventCode;
+	}
+
+	public void setEventCode(String eventCode) {
+		this.eventCode = eventCode;
 	}
 
 	public String getEventLabel() {
@@ -252,9 +260,15 @@ public class VisitSummary extends AttributeModifiedSupport implements Comparable
 			return result;
 		}
 
-		Date thisVisitDate = visitDate != null ? visitDate : anticipatedVisitDate;
-		Date otherVisitDate = other.visitDate != null ? other.visitDate : other.anticipatedVisitDate;
-		return ObjectUtils.compare(thisVisitDate, otherVisitDate, true);
+		return compareDates(other);
+	}
+
+	public int compareDates(VisitSummary other) {
+		return ObjectUtils.compare(
+			getVisitDate() != null ? getVisitDate() : getAnticipatedVisitDate(),
+			other.getVisitDate() != null ? other.getVisitDate() : other.getAnticipatedVisitDate(),
+			true
+		);
 	}
 
 	private void addInterval(Calendar cal, Integer interval, IntervalUnit intervalUnit) {

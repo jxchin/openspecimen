@@ -67,6 +67,7 @@ public class DefaultListGenerator implements ListGenerator {
 		op.setFacets(Collections.singletonList(expr));
 		op.setSearchTerm(searchTerm);
 		op.setRestriction(getCriteria(cfg, null));
+		op.setDisableAccessChecks(true);
 
 		ResponseEvent<List<FacetDetail>> resp = querySvc.getFacetValues(new RequestEvent<>(op));
 		resp.throwErrorIfUnsuccessful();
@@ -357,6 +358,8 @@ public class DefaultListGenerator implements ListGenerator {
 		op.setRunType("Data");
 		op.setDrivingForm(StringUtils.isBlank(drivingForm) ? "Participant" : drivingForm);
 		op.setWideRowMode("OFF");
+		op.setDisableAccessChecks(true);
+		op.setCaseSensitive(false);
 
 		RequestEvent<ExecuteQueryEventOp> req = new RequestEvent<>(op);
 		ResponseEvent<QueryExecResult> resp = querySvc.executeQuery(req);
@@ -386,6 +389,7 @@ public class DefaultListGenerator implements ListGenerator {
 
 		ListDetail listDetail = new ListDetail();
 		listDetail.setColumns(cfg.getColumns());
+		listDetail.setFixedColumns(cfg.getFixedColumns());
 		listDetail.setRows(rows);
 		return listDetail;
 	}

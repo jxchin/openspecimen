@@ -7,6 +7,11 @@
     <name>com.krishagni.catissueplus.core.biospecimen.events.SpecimenRequirementDetail</name>
 
     <field>
+      <caption>#getMessage("sr_identifier")</caption>
+      <attribute>id</attribute>
+    </field>
+
+    <field>
       <caption>#getMessage("sr_cp_short_title")</caption>
       <attribute>cpShortTitle</attribute>
     </field>
@@ -125,31 +130,10 @@
       <caption>#getMessage("sr_sort_order")</caption>
       <attribute>sortOrder</attribute>
     </field>
-    
-    <record>
-      <attribute>specimensPool</attribute>
-      <multiple>true</multiple>
-      <caption>#getMessage("sr_specimens_pool")</caption>
-      
-      <field>
-        <caption>#getMessage("sr_initial_qty")</caption>
-        <attribute>initialQty</attribute>
-      </field>
-      
-      <field>
-        <caption>#getMessage("sr_code")</caption>
-        <attribute>code</attribute>
-      </field>
-      
-      <field>
-        <caption>#getMessage("sr_label_auto_print_mode")</caption>
-        <attribute>labelAutoPrintMode</attribute>
-      </field>
-    
-      <field>
-        <caption>#getMessage("sr_label_print_copies")</caption>
-        <attribute>labelPrintCopies</attribute>
-      </field>
-    </record>
+
+    <field>
+      <caption>#getMessage("sr_activity_status")</caption>
+      <attribute>activityStatus</attribute>
+    </field>
   </record>
 </object-schema>

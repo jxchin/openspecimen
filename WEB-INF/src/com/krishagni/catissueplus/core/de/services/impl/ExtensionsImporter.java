@@ -15,6 +15,7 @@ import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolRegistration;
 import com.krishagni.catissueplus.core.biospecimen.domain.Specimen;
 import com.krishagni.catissueplus.core.biospecimen.domain.Visit;
+import com.krishagni.catissueplus.core.biospecimen.domain.factory.CpErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.CprErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.VisitErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.repository.DaoFactory;
@@ -36,6 +37,7 @@ import com.krishagni.catissueplus.core.importer.services.ObjectImporter;
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.Control;
 import edu.common.dynamicextensions.domain.nui.FileUploadControl;
+import edu.common.dynamicextensions.domain.nui.SignatureControl;
 import edu.common.dynamicextensions.domain.nui.SubFormControl;
 import edu.common.dynamicextensions.napi.FormData;
 import edu.common.dynamicextensions.nutility.FileUploadMgr;
@@ -105,8 +107,16 @@ public class ExtensionsImporter implements ObjectImporter<Map<String, Object>, M
 		CollectionProtocol cp = null;
 
 		if (entityType.equals("Participant") || entityType.equals("CommonParticipant")) {
-			String ppid = (String)extnObj.get("ppid");
 			String cpShortTitle = (String)extnObj.get("cpShortTitle");
+			if (StringUtils.isBlank(cpShortTitle)) {
+				return ResponseEvent.userError(CpErrorCode.SHORT_TITLE_REQUIRED);
+			}
+
+			String ppid = (String)extnObj.get("ppid");
+			if (StringUtils.isBlank(ppid)) {
+				return ResponseEvent.userError(CprErrorCode.PPID_REQUIRED);
+			}
+
 			CollectionProtocolRegistration cpr = daoFactory.getCprDao().getCprByCpShortTitleAndPpid(cpShortTitle, ppid);
 			if (cpr == null) {
 				return ResponseEvent.userError(CprErrorCode.NOT_FOUND);
@@ -116,6 +126,10 @@ public class ExtensionsImporter implements ObjectImporter<Map<String, Object>, M
 			cp = cpr.getCollectionProtocol();
 		} else if (entityType.equals("SpecimenCollectionGroup")) {
 			String visitName = (String)extnObj.get("visitName");
+			if (StringUtils.isBlank(visitName)) {
+				return ResponseEvent.userError(VisitErrorCode.NAME_REQUIRED);
+			}
+
 			Visit visit = daoFactory.getVisitsDao().getByName(visitName);
 			if (visit == null) {
 				return ResponseEvent.userError(VisitErrorCode.NOT_FOUND, visitName);
@@ -163,7 +177,7 @@ public class ExtensionsImporter implements ObjectImporter<Map<String, Object>, M
 		formDataDetail.setRecordId(formData.getRecordId());
 		formDataDetail.setFormData(formData);
 		formDataDetail.setPartial(true);
-		ResponseEvent<FormDataDetail> resp = formSvc.saveFormData(new RequestEvent<FormDataDetail>(formDataDetail));
+		ResponseEvent<FormDataDetail> resp = formSvc.saveFormData(new RequestEvent<>(formDataDetail));
 		resp.throwErrorIfUnsuccessful();
 		
 		return ResponseEvent.response(resp.getPayload().getFormData().getFieldNameValueMap(true));
@@ -187,22 +201,45 @@ public class ExtensionsImporter implements ObjectImporter<Map<String, Object>, M
 					}
 				}
 
-			} else if (ctrl instanceof FileUploadControl) {
-				String filename = (String)formValueMap.get(fieldName);
+			} else if (ctrl instanceof FileUploadControl || ctrl instanceof SignatureControl) {
+				String filename = null;
+				Object value = formValueMap.get(fieldName);
+				if (value instanceof String) {
+					filename = (String) value;
+				} else if (value instanceof Map) {
+					Map<String, Object> fcv = (Map<String, Object>) value;
+					filename = (String) fcv.get("filename");
+				}
+
 				if (StringUtils.isNotBlank(filename)) {
-					Map<String, String> fileDetail = uploadFile(filesDir, filename);
-					formValueMap.put(fieldName, fileDetail);
+					if (ctrl instanceof SignatureControl) {
+						String extn = null;
+						int lastDotIdx = filename.lastIndexOf(".");
+						if (lastDotIdx != -1) {
+							extn = filename.substring(lastDotIdx + 1);
+						}
+
+						Map<String, String> fileDetail = uploadFile(filesDir, filename, extn);
+						formValueMap.put(fieldName, fileDetail.get("fileId"));
+					} else {
+						Map<String, String> fileDetail = uploadFile(filesDir, filename);
+						formValueMap.put(fieldName, fileDetail);
+					}
 				}
 			}
 		}
 	}
 
 	private Map<String, String> uploadFile(String filesDir, String filename) {
+		return uploadFile(filesDir, filename, null);
+	}
+
+	private Map<String, String> uploadFile(String filesDir, String filename, String extn) {
 		FileInputStream fin = null;
 		try {
 			File fileToUpload = new File(filesDir + File.separator + filename);
 			fin = new FileInputStream(fileToUpload);
-			String fileId = FileUploadMgr.getInstance().saveFile(fin);
+			String fileId = FileUploadMgr.getInstance().saveFile(fin, extn);
 
 			Map<String, String> fileDetail = new HashMap<>();
 			fileDetail.put("filename", filename);

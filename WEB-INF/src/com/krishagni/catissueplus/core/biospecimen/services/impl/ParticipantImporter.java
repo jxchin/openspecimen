@@ -9,9 +9,11 @@ import com.krishagni.catissueplus.core.biospecimen.events.ParticipantDetail;
 import com.krishagni.catissueplus.core.biospecimen.repository.DaoFactory;
 import com.krishagni.catissueplus.core.biospecimen.services.ParticipantService;
 import com.krishagni.catissueplus.core.common.access.AccessCtrlMgr;
+import com.krishagni.catissueplus.core.common.errors.CommonErrorCode;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
+import com.krishagni.catissueplus.core.de.services.impl.ExtensionsUtil;
 import com.krishagni.catissueplus.core.importer.events.ImportObjectDetail;
 import com.krishagni.catissueplus.core.importer.services.ObjectImporter;
 
@@ -36,6 +38,7 @@ public class ParticipantImporter implements ObjectImporter<ParticipantDetail, Pa
 			ImportObjectDetail<ParticipantDetail> detail = req.getPayload();
 
 			ParticipantDetail participant = detail.getObject();
+			ExtensionsUtil.initFileFields(detail.getUploadedFilesDir(), participant.getExtensionDetail());
 			if (StringUtils.isBlank(participant.getSource())) {
 				participant.setSource(Participant.DEF_SOURCE);
 			}
@@ -44,7 +47,9 @@ public class ParticipantImporter implements ObjectImporter<ParticipantDetail, Pa
 				setParticipantId(participant);
 				return participantSvc.patchParticipant(new RequestEvent<>(participant));
 			} else {
-				return null;
+				return ResponseEvent.userError(
+					CommonErrorCode.INVALID_INPUT,
+					"Participants can only be edited! Please consider using participant registrations template");
 			}
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);

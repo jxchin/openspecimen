@@ -52,6 +52,10 @@
  
     <property name="manageForms" column="MANAGE_FORMS"/>
 
+    <property name="dnd" column="DND"/>
+
+    <property name="timeZone" column="TIME_ZONE"/>
+
     <set name="roles" inverse="true" cascade="none">
       <key column="SUBJECT_ID"/>
       <one-to-many class="com.krishagni.rbac.domain.SubjectRole"/>
@@ -185,9 +189,9 @@
         user.id in (:userIds)
     </query>
 
-    <query name="getEmailIdTypes">
+    <query name="getEmailIdDnds">
       select
-        u.emailAddress, u.type
+        u.emailAddress, u.dnd
       from
         com.krishagni.catissueplus.core.administrative.domain.User u
       where

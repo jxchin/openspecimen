@@ -1,6 +1,6 @@
 angular.module('os.biospecimen.participant')
   .controller('SpecimensListViewCtrl', function(
-    $scope, $state, currentUser, cp, sdeConfigured,
+    $scope, $state, currentUser, cp, sdeConfigured, mobileDataEntryEnabled,
     PluginReg, Specimen, SpecimensHolder, Alerts) {
 
     var ctrl = this;
@@ -21,6 +21,10 @@ angular.module('os.biospecimen.participant')
           listName: 'specimen-list-view',
           objectId: cp.id
         },
+        emptyState: {
+          loadingMessage: 'specimens.loading_list',
+          emptyMessage: 'specimens.empty_list'
+        },
         resourceOpts: ctrl.resourceOpts
       };
 
@@ -29,7 +33,8 @@ angular.module('os.biospecimen.participant')
         ctrl: ctrl,
         headerActionsTmpl: 'modules/biospecimen/participant/specimens-list-pager.html',
         headerButtonsTmpl: 'modules/biospecimen/participant/specimens-list-ops.html',
-        showPrimaryBtnDd: !!cp.bulkPartRegEnabled || (PluginReg.getTmpls('participant-list', 'primary-button').length > 0)
+        showPrimaryBtnDd: !!cp.bulkPartRegEnabled || (PluginReg.getTmpls('participant-list', 'primary-button').length > 0),
+        mobileDataEntryEnabled: mobileDataEntryEnabled
       });
     }
 
@@ -59,7 +64,7 @@ angular.module('os.biospecimen.participant')
     }
 
     $scope.setListCtrl = function(listCtrl) {
-      $scope.ctx.listCtrl = listCtrl;
+      ctrl.listCtrl = $scope.ctx.listCtrl = listCtrl;
       $scope.listViewCtx.showSearch = listCtrl.haveFilters;
       $scope.listViewCtx.pagerOpts  = listCtrl.pagerOpts;
     }
@@ -70,7 +75,7 @@ angular.module('os.biospecimen.participant')
         return [];
       }
 
-      return selectedSpmns.map(function(spmn) { return {id: spmn.hidden.specimenId}; });
+      return selectedSpmns.map(function(spmn) { return {id: spmn.hidden.specimenId, cpId: cp.id}; });
     }
 
     this.loadSpecimens = function() {

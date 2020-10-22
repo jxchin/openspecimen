@@ -57,7 +57,7 @@ angular.module('os.administrative.dp',
               breadcrumbs: [{state: 'dp-list', title: 'dp.list'}],
               objectType: 'distributionProtocol',
               title: 'dp.bulk_import',
-              onSuccess: {state: 'dp-list'}
+              onSuccess: {state: 'dp-import-jobs'}
             };
           }
         },
@@ -73,7 +73,7 @@ angular.module('os.administrative.dp',
               breadcrumbs: [{state: 'dp-list', title: 'dp.list'}],
               objectType: 'dpRequirement',
               title: 'dp.req_bulk_import',
-              onSuccess: {state: 'dp-list'}
+              onSuccess: {state: 'dp-import-jobs'}
             };
           }
         },
@@ -115,8 +115,11 @@ angular.module('os.administrative.dp',
         templateUrl: 'modules/administrative/dp/consents.html',
         parent: 'dp-detail',
         resolve: {
-          consentTiers: function(distributionProtocol) {
-            return distributionProtocol.getConsentTiers();
+          hasEc: function($injector) {
+            return $injector.has('ecValidation');
+          },
+          consentTiers: function(hasEc, distributionProtocol) {
+            return hasEc ? [] : distributionProtocol.getConsentTiers();
           }
         },
         controller: 'DpConsentsCtrl'

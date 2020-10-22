@@ -1,5 +1,5 @@
 angular.module('os.biospecimen.participant')
-  .factory('ImportUtil', function($translate) {
+  .factory('ImportUtil', function($translate, $injector) {
     var pluginTypes = {};
 
     function addPluginTypes(importTypes, group, entityType) {
@@ -38,7 +38,7 @@ angular.module('os.biospecimen.participant')
       return importTypes;
     }
 
-    function getParticipantTypes(entityForms, cpId) {
+    function getParticipantTypes(entityForms, cpId, addConsent) {
       var group = $translate.instant('participant.title');
 
       var importTypes = [];
@@ -57,17 +57,29 @@ angular.module('os.biospecimen.participant')
         ]
       }
 
-      importTypes = importTypes.concat([
-        {
-          group: group, type: 'consent', title: 'participant.consents',
-          showImportType: false, csvType: 'MULTIPLE_ROWS_PER_OBJ', importType: 'UPDATE'
-        }
-      ]);
+      if (addConsent) {
+        importTypes = importTypes.concat(getConsentTypes(cpId));
+      }
 
       addPluginTypes(importTypes, group, 'Participant');
       addForms(importTypes, group, 'CommonParticipant', entityForms['CommonParticipant']);
       return addForms(importTypes, group, 'Participant', entityForms['Participant']);
     } 
+
+    function getConsentTypes(cpId) {
+      var group = $translate.instant('participant.title');
+      if ($injector.has('ecDocument')) {
+        return [{
+          group: group, type: 'econsentsDocumentResponse', title: 'participant.consents',
+          showImportType: false, importType: 'UPDATE'
+        }];
+      } else {
+        return [{
+          group: group, type: 'consent', title: 'participant.consents',
+          showImportType: false, csvType: 'MULTIPLE_ROWS_PER_OBJ', importType: 'UPDATE'
+        }];
+      }
+    }
 
     function getVisitTypes(entityForms) {
       var group = $translate.instant('visits.title');
@@ -115,10 +127,10 @@ angular.module('os.biospecimen.participant')
       var breadcrumbs, onSuccess;
       if (cp.id == -1) {
         breadcrumbs = [{state: 'cp-list', title: "cp.list"}];
-        onSuccess = {state: 'cp-list'};
+        onSuccess = {state: 'import-multi-cp-jobs'};
       } else {
         breadcrumbs = [{state: 'cp-list-view', title: cp.shortTitle, params: '{cpId:' + cp.id + '}'}];
-        onSuccess = {state: 'cp-list-view', params: {cpId: cp.id}};
+        onSuccess = {state: 'import-cp-jobs', params: {cpId: cp.id}};
       }
 
       var entityForms = {};
@@ -132,7 +144,9 @@ angular.module('os.biospecimen.participant')
 
       var importTypes = [];
       if (!cp.specimenCentric && allowedEntityTypes.indexOf('Participant') >= 0) {
-        importTypes = importTypes.concat(getParticipantTypes(entityForms, cp.id));
+        importTypes = importTypes.concat(getParticipantTypes(entityForms, cp.id, allowedEntityTypes.indexOf('Consent') >= 0));
+      } else if (!cp.specimenCentric && allowedEntityTypes.indexOf('Consent') >= 0) {
+        importTypes = importTypes.concat(getConsentTypes(cp.id));
       }
 
       if (!cp.specimenCentric && allowedEntityTypes.indexOf('SpecimenCollectionGroup') >= 0) {

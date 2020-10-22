@@ -7,6 +7,8 @@ import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolGrou
 import com.krishagni.catissueplus.core.biospecimen.events.CpGroupFormsDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CpGroupWorkflowCfgDetail;
 import com.krishagni.catissueplus.core.biospecimen.repository.CpGroupListCriteria;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityOp;
+import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityResp;
 import com.krishagni.catissueplus.core.common.events.EntityQueryCriteria;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
@@ -19,6 +21,8 @@ public interface CollectionProtocolGroupService {
 	ResponseEvent<CollectionProtocolGroupDetail> createGroup(RequestEvent<CollectionProtocolGroupDetail> req);
 
 	ResponseEvent<CollectionProtocolGroupDetail> updateGroup(RequestEvent<CollectionProtocolGroupDetail> req);
+
+	ResponseEvent<BulkDeleteEntityResp<CollectionProtocolGroupSummary>> deleteGroups(RequestEvent<BulkDeleteEntityOp> req);
 
 	ResponseEvent<List<CpGroupFormsDetail>> getForms(RequestEvent<EntityQueryCriteria> req);
 

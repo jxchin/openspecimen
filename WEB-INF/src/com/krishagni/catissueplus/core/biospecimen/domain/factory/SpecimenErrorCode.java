@@ -72,12 +72,6 @@ public enum SpecimenErrorCode implements ErrorCode {
 	
 	INVALID_CREATION_DATE,
 
-	CREATED_ON_GT_CURRENT,
-
-	CHILD_CREATED_ON_LT_PARENT,
-
-	PARENT_CREATED_ON_GT_CHILDREN,
-	
 	EDIT_NOT_ALLOWED,
 	
 	AVBL_QTY_GT_INIT_QTY,
@@ -118,10 +112,6 @@ public enum SpecimenErrorCode implements ErrorCode {
 
 	INVALID_DISPOSE_STATUS,
 
-	DISPOSAL_DT_LT_COLL_DT,
-
-	DISPOSAL_DT_LT_CREATED_ON,
-
 	CONTAINER_ACCESS_DENIED,
 
 	PARENT_CONTAINER_REQ,
@@ -132,7 +122,9 @@ public enum SpecimenErrorCode implements ErrorCode {
 
 	EXT_ID_DUP_NAME,
 
-	VISIT_CHG_NOT_ALLOWED;
+	VISIT_CHG_NOT_ALLOWED,
+
+	LABELS_SRCH_LIMIT_MAXED;
 
 	public String code() {
 		return "SPECIMEN_" + this.name();

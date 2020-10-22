@@ -2,6 +2,7 @@
 package com.krishagni.catissueplus.core.administrative.services.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
@@ -67,6 +68,7 @@ import com.krishagni.catissueplus.core.exporter.domain.ExportJob;
 import com.krishagni.catissueplus.core.exporter.services.ExportService;
 import com.krishagni.rbac.events.SubjectRoleDetail;
 import com.krishagni.rbac.events.SubjectRoleOpNotif;
+import com.krishagni.rbac.events.SubjectRolesList;
 import com.krishagni.rbac.service.RbacService;
 
 public class UserServiceImpl implements UserService, ObjectAccessor, InitializingBean, UserDetailsService, SAMLUserDetailsService {
@@ -97,6 +99,8 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 	private static final String AUTH_MOD = "auth";
 
 	private static final String FORGOT_PASSWD = "forgot_password";
+
+	private static final String DUMMY_EMAIL_ADDR = "localhost@localhost";
 
 	private static final Map<String, String> NOTIF_OPS = new HashMap<String, String>() {{
 		put("created",  "CREATE");
@@ -141,9 +145,11 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 	@PlusTransactional
 	public ResponseEvent<List<UserSummary>> getUsers(RequestEvent<UserListCriteria> req) {
 		UserListCriteria crit = req.getPayload();
-
 		validateTypes(crit.type());
 		validateTypes(crit.excludeTypes());
+		if (AuthUtil.getCurrentUser() == null) {
+			crit.includeSysUser(false);
+		}
 
 		List<User> users = daoFactory.getUserDao().getUsers(addUserListCriteria(crit));
 		return ResponseEvent.response(UserSummary.from(users));
@@ -153,9 +159,11 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 	@PlusTransactional
 	public ResponseEvent<Long> getUsersCount(RequestEvent<UserListCriteria> req) {
 		UserListCriteria crit = req.getPayload();
-
 		validateTypes(crit.type());
 		validateTypes(crit.excludeTypes());
+		if (AuthUtil.getCurrentUser() == null) {
+			crit.includeSysUser(false);
+		}
 
 		return ResponseEvent.response(daoFactory.getUserDao().getUsersCount(addUserListCriteria(crit)));
 	}
@@ -398,10 +406,12 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 				if (!user.isValidOldPassword(detail.getOldPassword())) {
 					return ResponseEvent.userError(UserErrorCode.INVALID_OLD_PASSWD);
 				}
-
 			} else if (!currentUser.isAdmin()) {
-				return ResponseEvent.userError(UserErrorCode.PERMISSION_DENIED);
+				if (!currentUser.isInstituteAdmin() || !currentUser.getInstitute().equals(user.getInstitute())) {
+					return ResponseEvent.userError(UserErrorCode.PERMISSION_DENIED);
+				}
 			}
+
 			user.changePassword(detail.getNewPassword());
 			daoFactory.getUserDao().saveOrUpdate(user);
 			sendPasswdChangedEmail(user);
@@ -429,7 +439,7 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 			}
 			
 			User user = token.getUser();
-			if (!user.getLoginName().equals(detail.getLoginName())) {
+			if (!user.getLoginName().equalsIgnoreCase(detail.getLoginName())) {
 				return ResponseEvent.userError(UserErrorCode.NOT_FOUND);
 			}
 			
@@ -527,9 +537,17 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 	@Override
 	@PlusTransactional
 	public ResponseEvent<UserUiState> saveUiState(RequestEvent<Map<String, Object>> req) {
-		UserUiState uiState = new UserUiState();
-		uiState.setUserId(AuthUtil.getCurrentUser().getId());
-		uiState.setState(req.getPayload());
+		UserUiState uiState = daoFactory.getUserDao().getState(AuthUtil.getCurrentUser().getId());
+		if (uiState == null) {
+			uiState = new UserUiState();
+			uiState.setUserId(AuthUtil.getCurrentUser().getId());
+		}
+
+		if (uiState.getState() == null) {
+			uiState.setState(new HashMap<>());
+		}
+
+		uiState.getState().putAll(req.getPayload());
 		daoFactory.getUserDao().saveUiState(uiState);
 		return ResponseEvent.response(uiState);
 	}
@@ -593,7 +611,8 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 
 	@Override
 	public void afterPropertiesSet() throws Exception {
-		exportSvc.registerObjectsGenerator("user", this::getUsersGenerator);
+		exportSvc.registerObjectsGenerator("user",      this::getUsersGenerator);
+		exportSvc.registerObjectsGenerator("userRoles", this::getUserRolesGenerator);
 	}
 
 	private void validateTypes(Collection<String> types) {
@@ -632,20 +651,34 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 		}
 	}
 
-	private UserDetail updateUser(UserDetail detail, boolean partial) {
-		User existingUser = getUser(detail.getId(), detail.getEmailAddress());
+	private UserDetail updateUser(UserDetail input, boolean partial) {
+		User existingUser = getUser(input.getId(), input.getEmailAddress());
 
-		if (Status.ACTIVITY_STATUS_DISABLED.getStatus().equals(detail.getActivityStatus())) {
+		if (Status.ACTIVITY_STATUS_DISABLED.getStatus().equals(input.getActivityStatus())) {
 			AccessCtrlMgr.getInstance().ensureDeleteUserRights(existingUser);
 		} else {
 			AccessCtrlMgr.getInstance().ensureUpdateUserRights(existingUser);
+			if (!AuthUtil.isAdmin() && AuthUtil.getCurrentUser().equals(existingUser)) {
+				//
+				// User is not an admin and trying update his/her profile.
+				//
+				UserDetail newDetail = UserDetail.from(existingUser);
+				List<String> allowedAttrs = Arrays.asList("phoneNumber", "timeZone", "dnd", "address");
+				for (String attr : allowedAttrs) {
+					if (input.isAttrModified(attr)) {
+						Utility.setProperty(newDetail, attr, Utility.getProperty(input, attr));
+					}
+				}
+
+				input = newDetail;
+			}
 		}
 
 		User user = null;
 		if (partial) {
-			user = userFactory.createUser(existingUser, detail);
+			user = userFactory.createUser(existingUser, input);
 		} else {
-			user = userFactory.createUser(detail);
+			user = userFactory.createUser(input);
 		}
 
 		resetAttrs(existingUser, user);
@@ -750,7 +783,8 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 		Map<String, Object> props = new HashMap<String, Object>();
 		props.put("user", user);
 		props.put("token", token);
-		
+		props.put("ignoreDnd", true);
+
 		emailService.sendEmail(FORGOT_PASSWORD_EMAIL_TMPL, new String[]{user.getEmailAddress()}, props);
 	}
 	
@@ -766,7 +800,8 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 		props.put("user", user);
 		props.put("token", token);
 		props.put("ccAdmin", false);
-		
+		props.put("ignoreDnd", true);
+
 		EmailUtil.getInstance().sendEmail(USER_CREATED_EMAIL_TMPL, new String[]{user.getEmailAddress()}, null, props);
 	}
 
@@ -993,12 +1028,18 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 
 	private void emailAnnouncements(AnnouncementDetail detail, List<String> emailAddresses) {
 		String[] adminEmailAddr = {ConfigUtil.getInstance().getAdminEmailId()};
-		String[] rcpts = emailAddresses.toArray(new String[emailAddresses.size()]);
+
+		if (StringUtils.isBlank(adminEmailAddr[0])) {
+			adminEmailAddr[0] = AuthUtil.getCurrentUser().getEmailAddress();
+		}
+
+		String[] rcpts = emailAddresses.toArray(new String[0]);
 
 		Map<String, Object> props = new HashMap<>();
 		props.put("user", AuthUtil.getCurrentUser());
 		props.put("$subject", new String[] { detail.getSubject() });
 		props.put("annDetail", detail);
+		props.put("ignoreDnd", true);
 		emailService.sendEmail(ANNOUNCEMENT_EMAIL_TMPL, adminEmailAddr, rcpts, null, props);
 	}
 
@@ -1053,8 +1094,16 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 		return detail;
 	}
 
-	private Function<ExportJob, List<? extends Object>> getUsersGenerator() {
-		return new Function<ExportJob, List<? extends Object>>() {
+	private Function<ExportJob, List<?>> getUsersGenerator() {
+		return getUsersGenerator(UserDetail::from);
+	}
+
+	private Function<ExportJob, List<?>> getUserRolesGenerator() {
+		return getUsersGenerator(this::getRolesList);
+	}
+
+	private Function<ExportJob, List<?>> getUsersGenerator(Function<List<User>, List<?>> transformer) {
+		return new Function<ExportJob, List<?>>() {
 			private boolean endOfUsers;
 
 			private int startAt;
@@ -1076,7 +1125,7 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 					endOfUsers = true;
 				}
 
-				return UserDetail.from(users);
+				return transformer.apply(users);
 			}
 
 			private void initParams() {
@@ -1088,5 +1137,11 @@ public class UserServiceImpl implements UserService, ObjectAccessor, Initializin
 				paramsInited = true;
 			}
 		};
+	}
+
+	private List<SubjectRolesList> getRolesList(List<User> users) {
+		return users.stream()
+			.map(user -> SubjectRolesList.from(user.getId(), user.getEmailAddress(), user.getRoles()))
+			.collect(Collectors.toList());
 	}
 }

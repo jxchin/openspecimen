@@ -7,35 +7,41 @@
         <span translate="common.buttons.edit">Edit</span>
       </button>
       <button show-if-allowed="containerResource.updateOpts" class="default" ng-click="move()">
-        <span class="fa fa-exchange"></span>
+        <span class="fa fa-arrows-h"></span>
         <span translate="container.transfer">Move</span>
       </button>
       <button show-if-allowed="containerResource.deleteOpts" class="default" ng-click="deleteContainer()">
         <span class="fa fa-trash"></span>
         <span translate="common.buttons.delete">Delete</span>
       </button>
+      <button class="default" ng-click="printLabel()">
+        <span class="fa fa-print"></span>
+        <span translate="common.buttons.print">Print</span>
+      </button>
       <div dropdown class="os-inline-btn">
         <button class="btn btn-default dropdown-toggle default">
-          <span translate="common.buttons.more">More</span>
+          <span translate="common.buttons.export">Export</span>
           <span class="fa fa-caret-down"></span>
         </button>
         <ul class="dropdown-menu">
+          <li ng-if="!ctx.dimless">
+            <a ng-click="exportMap()">
+              <span translate="container.map">Map</span>
+            </a>
+          </li>
           <li show-if-allowed="containerResource.updateOpts">
             <a ng-click="defragment()">
-              <span class="fa fa-cubes" style="padding-right: 7px;"></span>
               <span translate="container.defragment">Defragment</span>
             </a>
           </li>
-          <li ng-if="!ctx.dimless">
-            <a href="{{ctx.downloadUri}}" target="_blank">
-              <span class="fa fa-download"></span>
-              <span translate="common.buttons.export">Export</span>
+          <li>
+            <a ng-click="exportEmptyPositionsReport()">
+              <span translate="container.empty_positions">Empty Positions</span>
             </a>
           </li>
           <li>
-            <a ng-click="printLabel()">
-              <span class="fa fa-print"></span>
-              <span translate="common.buttons.print">Print</span>
+            <a ng-click="exportUtilisationReport()">
+              <span translate="container.utilisation_exp">Utilisation</span>
             </a>
           </li>
         </ul>

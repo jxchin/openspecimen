@@ -47,6 +47,9 @@ public class ConsentDetail extends AttributeModifiedSupport implements Mergeable
 	//For BO
 	@JsonIgnore
 	private String statement;
+
+	@JsonIgnore
+	private String code;
 	
 	@JsonIgnore
 	private String response;
@@ -133,7 +136,15 @@ public class ConsentDetail extends AttributeModifiedSupport implements Mergeable
 	public void setStatement(String statement) {
 		this.statement = statement;
 	}
-	
+
+	public String getCode() {
+		return code;
+	}
+
+	public void setCode(String code) {
+		this.code = code;
+	}
+
 	public String getResponse() {
 		return response;
 	}
@@ -150,7 +161,7 @@ public class ConsentDetail extends AttributeModifiedSupport implements Mergeable
 		this.documentFile = documentFile;
 	}
 
-	public static ConsentDetail fromCpr(CollectionProtocolRegistration cpr, boolean excludePhi) {
+	public static ConsentDetail fromCpr(CollectionProtocolRegistration cpr) {
 		ConsentDetail consent = new ConsentDetail();
 		consent.setCpShortTitle(cpr.getCpShortTitle());
 		consent.setPpid(cpr.getPpid());
@@ -159,7 +170,7 @@ public class ConsentDetail extends AttributeModifiedSupport implements Mergeable
 		
 		String fileName = cpr.getSignedConsentDocumentName();
 		if (fileName != null) {
-			fileName = excludePhi ? "###" : fileName.split("_", 2)[1];
+			fileName = fileName.split("_", 2)[1];
 		}
 		consent.setConsentDocumentName(fileName);
 		
@@ -194,13 +205,14 @@ public class ConsentDetail extends AttributeModifiedSupport implements Mergeable
 
 	@Override
 	public void merge(ConsentDetail other) {
-		if (StringUtils.isBlank(other.getStatement())) {
+		if (StringUtils.isBlank(other.getStatement()) && StringUtils.isBlank(other.getCode())) {
 			return;
 		}
 
 		ConsentTierResponseDetail response = new ConsentTierResponseDetail();
 		response.setStatement(other.getStatement());
 		response.setResponse(other.getResponse());
+		response.setCode(other.getCode());
 		
 		getResponses().add(response);
 	}

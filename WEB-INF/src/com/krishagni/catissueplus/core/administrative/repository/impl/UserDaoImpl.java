@@ -30,6 +30,7 @@ import com.krishagni.catissueplus.core.administrative.domain.UserUiState;
 import com.krishagni.catissueplus.core.administrative.repository.UserDao;
 import com.krishagni.catissueplus.core.administrative.repository.UserListCriteria;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
+import com.krishagni.catissueplus.core.common.Pair;
 import com.krishagni.catissueplus.core.common.events.DependentEntityDetail;
 import com.krishagni.catissueplus.core.common.repository.AbstractDao;
 import com.krishagni.catissueplus.core.common.util.Status;
@@ -224,11 +225,12 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public Map<String, String> getEmailIdUserTypes(Collection<String> emailIds) {
-		List<Object[]> rows = getCurrentSession().getNamedQuery(GET_EMAIL_ID_TYPES)
+	public Map<String, Boolean> getEmailIdDnds(Collection<String> emailIds) {
+		List<Object[]> rows = getCurrentSession().getNamedQuery(GET_EMAIL_ID_DNDS)
 			.setParameterList("emailIds", emailIds)
 			.list();
-		return rows.stream().collect(Collectors.toMap(row -> (String)row[0], row -> ((User.Type)row[1]).name()));
+
+		return rows.stream().collect(Collectors.toMap(row -> (String) row[0], row -> (Boolean) row[1]));
 	}
 
 	@Override
@@ -258,8 +260,12 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 		return criteria;
 	}
 
-	private List<String> excludeUsersList() {
-		return Arrays.asList(User.SYS_USER, "public_catalog_user", "public_dashboard_user");
+	private List<String> excludeUsersList(boolean includeSysUser) {
+		if (includeSysUser) {
+			return Arrays.asList("public_catalog_user", "public_dashboard_user");
+		} else {
+			return Arrays.asList(User.SYS_USER, "public_catalog_user", "public_dashboard_user");
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -279,7 +285,7 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 	}
 	
 	private Criteria addSearchConditions(Criteria criteria, UserListCriteria listCrit) {
-		addNonSystemUserRestriction(criteria);
+		addNonSystemUserRestriction(criteria, listCrit.includeSysUser());
 
 		String searchString = listCrit.query();
 		if (StringUtils.isBlank(searchString)) {
@@ -287,10 +293,10 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 			addLoginNameRestriction(criteria, listCrit.loginName());
 		} else {
 			criteria.add(
-				Restrictions.disjunction()
-					.add(Restrictions.ilike("u.firstName", searchString, MatchMode.ANYWHERE))
-					.add(Restrictions.ilike("u.lastName",  searchString, MatchMode.ANYWHERE))
-					.add(Restrictions.ilike("u.loginName", searchString, MatchMode.ANYWHERE))
+				Restrictions.or(
+					Restrictions.ilike("u.firstName", searchString, MatchMode.ANYWHERE),
+					Restrictions.ilike("u.lastName",  searchString, MatchMode.ANYWHERE)
+				)
 			);
 		}
 
@@ -306,11 +312,11 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 		return criteria;
 	}
 
-	private void addNonSystemUserRestriction(Criteria criteria) {
+	private void addNonSystemUserRestriction(Criteria criteria, boolean includeSysUser) {
 		criteria.createAlias("u.authDomain", "domain")
 			.add( // not system user
 				Restrictions.not(Restrictions.conjunction()
-					.add(Restrictions.in("u.loginName", excludeUsersList()))
+					.add(Restrictions.in("u.loginName", excludeUsersList(includeSysUser)))
 					.add(Restrictions.eq("domain.name", User.DEFAULT_AUTH_DOMAIN))
 			)
 		);
@@ -339,10 +345,9 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 	private void addActivityStatusRestriction(Criteria criteria, String activityStatus) {
 		if (StringUtils.isBlank(activityStatus)) {
 			criteria.add(Restrictions.ne("u.activityStatus", Status.ACTIVITY_STATUS_CLOSED.getStatus()));
-		} else {
+		} else if (!activityStatus.equalsIgnoreCase("all")) {
 			criteria.add(Restrictions.eq("u.activityStatus", activityStatus));
 		}
-
 	}
 
 	private void addTypeRestriction(Criteria criteria, String type) {
@@ -521,7 +526,7 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
 	
 	private static final String UPDATE_STATUS = FQN + ".updateStatus";
 
-	private static final String GET_EMAIL_ID_TYPES = FQN + ".getEmailIdTypes";
+	private static final String GET_EMAIL_ID_DNDS = FQN + ".getEmailIdDnds";
 
 	private static final String GET_STATE = UserUiState.class.getName() + ".getState";
 }

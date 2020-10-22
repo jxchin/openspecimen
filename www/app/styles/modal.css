@@ -1,4 +1,8 @@
 
+.modal .modal-dialog {
+  margin-top: 39px;
+}
+
 .os-modal-header {
   height: 44px;
   background-color: #edeff0;
@@ -53,3 +57,13 @@
 .os-modal-body .os-alert {
   margin-top: -10px;
 }
+
+.os-modal.os-error-modal .os-modal-header {
+  background: #d9534f;
+  color: #fff;
+}
+
+.os-modal.os-error-modal {
+  border: 1px solid #d43f3a;
+}
+

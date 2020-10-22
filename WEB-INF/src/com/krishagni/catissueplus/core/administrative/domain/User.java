@@ -79,7 +79,11 @@ public class User extends BaseEntity implements UserDetails {
 	private Type type;
 
 	private Boolean manageForms;
-	
+
+	private String timeZone;
+
+	private Boolean dnd;
+
 	private Set<Password> passwords = new HashSet<>();
 
 	private Set<SubjectRole> roles = new HashSet<>();
@@ -235,6 +239,26 @@ public class User extends BaseEntity implements UserDetails {
 		this.manageForms = manageForms;
 	}
 
+	public String getTimeZone() {
+		return timeZone;
+	}
+
+	public void setTimeZone(String timeZone) {
+		this.timeZone = timeZone;
+	}
+
+	public boolean isDndEnabled() {
+		return Boolean.TRUE.equals(getDnd());
+	}
+
+	public Boolean getDnd() {
+		return dnd;
+	}
+
+	public void setDnd(Boolean dnd) {
+		this.dnd = dnd;
+	}
+
 	@NotAudited
 	public Set<Password> getPasswords() {
 		return passwords;
@@ -310,6 +334,8 @@ public class User extends BaseEntity implements UserDetails {
 		setEmailAddress(user.getEmailAddress());
 		setPhoneNumber(user.getPhoneNumber());
 		setComments(user.getComments());
+		setTimeZone(user.getTimeZone());
+		setDnd(user.isDndEnabled());
 
 		if (!isContact()) {
 			setAuthDomain(user.getAuthDomain());

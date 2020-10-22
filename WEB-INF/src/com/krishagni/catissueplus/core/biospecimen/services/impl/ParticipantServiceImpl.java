@@ -207,7 +207,7 @@ public class ParticipantServiceImpl implements ParticipantService, ObjectAccesso
 		} else if (generator == null && StringUtils.isNotBlank(newEmpi) && !newEmpi.equals(existingEmpi)) {
 			ParticipantUtil.ensureUniqueEmpi(daoFactory, newEmpi, ose);
 		}
-		
+
 		List<PmiDetail> pmis = PmiDetail.from(newParticipant.getPmis(), false);
 		ParticipantUtil.ensureUniquePmis(daoFactory, pmis, existing, ose);
 		ose.checkAndThrow();

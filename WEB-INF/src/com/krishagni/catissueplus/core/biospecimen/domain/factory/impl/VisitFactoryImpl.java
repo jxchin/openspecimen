@@ -2,8 +2,6 @@
 package com.krishagni.catissueplus.core.biospecimen.domain.factory.impl;
 
 import static com.krishagni.catissueplus.core.common.PvAttributes.*;
-import static com.krishagni.catissueplus.core.common.service.PvValidator.areValid;
-import static com.krishagni.catissueplus.core.common.service.PvValidator.isValid;
 
 import java.util.Calendar;
 import java.util.Date;
@@ -18,6 +16,7 @@ import com.krishagni.catissueplus.core.administrative.domain.PermissibleValue;
 import com.krishagni.catissueplus.core.administrative.domain.Site;
 import com.krishagni.catissueplus.core.administrative.domain.User;
 import com.krishagni.catissueplus.core.administrative.domain.factory.SiteErrorCode;
+import com.krishagni.catissueplus.core.biospecimen.ConfigParams;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolRegistration;
 import com.krishagni.catissueplus.core.biospecimen.domain.ParticipantMedicalIdentifier;
@@ -31,6 +30,7 @@ import com.krishagni.catissueplus.core.biospecimen.repository.DaoFactory;
 import com.krishagni.catissueplus.core.common.errors.ActivityStatusErrorCode;
 import com.krishagni.catissueplus.core.common.errors.ErrorType;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
+import com.krishagni.catissueplus.core.common.util.ConfigUtil;
 import com.krishagni.catissueplus.core.common.util.Status;
 import com.krishagni.catissueplus.core.de.domain.DeObject;
 
@@ -38,22 +38,10 @@ public class VisitFactoryImpl implements VisitFactory {
 
 	private DaoFactory daoFactory;
 	
-	private String defaultNameTmpl;
-	
-	private String unplannedNameTmpl;
-
 	public void setDaoFactory(DaoFactory daoFactory) {
 		this.daoFactory = daoFactory;
 	}
 	
-	public void setDefaultNameTmpl(String defNameTmpl) {
-		this.defaultNameTmpl = defNameTmpl;
-	}
-
-	public void setUnplannedNameTmpl(String unplannedNameTmpl) {
-		this.unplannedNameTmpl = unplannedNameTmpl;
-	}
-
 	@Override
 	public Visit createVisit(VisitDetail visitDetail) {
 		Visit visit = new Visit();
@@ -79,7 +67,7 @@ public class VisitFactoryImpl implements VisitFactory {
 		setCohort(visitDetail, visit, ose);
 		visit.setComments(visitDetail.getComments());
 		visit.setSurgicalPathologyNumber(visitDetail.getSurgicalPathologyNumber());
-		visit.setDefNameTmpl(visit.isUnplanned() ? unplannedNameTmpl : defaultNameTmpl);
+		visit.setDefNameTmpl(visit.isUnplanned() ? getUnplannedNameTmpl() : getDefaultNameTmpl());
 		setVisitExtension(visitDetail, visit, ose);
 		
 		ose.checkAndThrow();
@@ -116,7 +104,7 @@ public class VisitFactoryImpl implements VisitFactory {
 		setMissedVisitReason(detail, existing, visit, ose);
 		setMissedBy(detail, existing, visit, ose);
 		setCohort(detail, existing, visit, ose);
-		visit.setDefNameTmpl(visit.isUnplanned() ? unplannedNameTmpl : defaultNameTmpl);
+		visit.setDefNameTmpl(visit.isUnplanned() ? getUnplannedNameTmpl() : getDefaultNameTmpl());
 		setVisitExtension(detail, existing, visit, ose);
 
 		ose.checkAndThrow();
@@ -473,8 +461,30 @@ public class VisitFactoryImpl implements VisitFactory {
 			visit.setCohort(existing.getCohort());
 		}
 	}
-	
+
+	private String getDefaultNameTmpl() {
+		String defVisitFmt = ConfigUtil.getInstance().getStrSetting(ConfigParams.MODULE, ConfigParams.VISIT_NAME_FMT);
+		if (StringUtils.isBlank(defVisitFmt)) {
+			throw new OpenSpecimenException(ErrorType.USER_ERROR, VisitErrorCode.NAME_FMT_NOT_SPECIFIED);
+		}
+
+		return defVisitFmt;
+	}
+
+	private String getUnplannedNameTmpl() {
+		String defVisitFmt = ConfigUtil.getInstance().getStrSetting(ConfigParams.MODULE, ConfigParams.UNPLANNED_VISIT_NAME_FMT);
+		if (StringUtils.isBlank(defVisitFmt)) {
+			throw new OpenSpecimenException(ErrorType.USER_ERROR, VisitErrorCode.NAME_FMT_NOT_SPECIFIED);
+		}
+
+		return defVisitFmt;
+	}
+
 	private void setVisitExtension(VisitDetail visitDetail, Visit visit, OpenSpecimenException ose) {
+		if (visit.getRegistration() == null) {
+			return;
+		}
+
 		DeObject extension = DeObject.createExtension(visitDetail.getExtensionDetail(), visit);
 		visit.setExtension(extension);
 	}

@@ -468,6 +468,7 @@ public class ConfigurationServiceImpl implements ConfigurationService, Initializ
 		props.put("data_dir",                getDataDir());
 		props.put("not_specified",           getStrSetting("common", "not_specified_text"));
 		props.put("searchDelay",             getIntSetting("common", "search_delay", 1000));
+		props.put("allowHtmlMarkup",         getBoolSetting("common", "de_form_html_markup", true));
 		return props;
 	}
 
@@ -606,14 +607,18 @@ public class ConfigurationServiceImpl implements ConfigurationService, Initializ
 	}
 
 	private void notifyListeners(String module, String property, String setting) {
+		List<ConfigChangeListener> toNotifyListeners = new ArrayList<>();
 		List<ConfigChangeListener> listeners = changeListeners.get(module);
-		if (listeners == null) {
-			return;
+		if (listeners != null) {
+			toNotifyListeners.addAll(listeners);
 		}
-		
-		for (ConfigChangeListener listener : listeners) {
-			listener.onConfigChange(property, setting);
+
+		listeners = changeListeners.get("*");
+		if (listeners != null) {
+			toNotifyListeners.addAll(listeners);
 		}
+
+		toNotifyListeners.forEach(listener -> listener.onConfigChange(property, setting));
 	}
 	
 	private void setLocale() {

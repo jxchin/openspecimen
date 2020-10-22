@@ -31,7 +31,7 @@ body {
   height: 40px;
   width: 235px;
   padding: 2.5px;
-  flex-grow: 0.30;
+  flex-grow: 1;
   position: relative;
 }
 
@@ -146,10 +146,14 @@ body {
   background: inherit;
 }
 
+.os-navbar ul.menu.os-hide-nav-buttons > li:not(.info) {
+  display: none;
+}
+
 .os-navbar-docked {
   position: fixed;
   top: 0px;
-  z-index: 3000;
+  z-index: 1000;
 }
 
 .os-navbar .search {
@@ -363,6 +367,19 @@ h4 + .btn-group {
 
 .os-btns button.full-width {
   width: 100%;
+}
+
+.os-btn-info {
+  border: 0px;
+  padding: 2px 0px 0px 0px;
+  margin-top: -5px;
+  font-size: 20px;
+  width: 32px;
+  color: rgb(66, 139, 202);
+}
+
+.os-btn-info:hover {
+  color: rgb(66, 139, 202);
 }
 
 .panel .panel-heading .os-btns {
@@ -965,7 +982,7 @@ h4.os-sub-section-title, h5.os-sub-section-title, h6.os-sub-section-title {
   top: 3px;
 }
 
-.os-col,.os-col-2,.os-col-5,.os-col-10,.os-col-12,.os-col-14,.os-col-15,.os-col-20,.os-col-25,
+.os-col,.os-col-2,.os-col-5,.os-col-10,.os-col-12,.os-col-13,.os-col-14,.os-col-15,.os-col-20,.os-col-23,.os-col-25,
 .os-col-30,.os-col-35,.os-col-40,.os-col-45,.os-col-50,
 .os-col-55,.os-col-60,.os-col-65,.os-col-70,.os-col-75,
 .os-col-80,.os-col-85,.os-col-90,.os-col-95,.os-col-100 {
@@ -990,6 +1007,10 @@ h4.os-sub-section-title, h5.os-sub-section-title, h6.os-sub-section-title {
   width: 12%;
 }
 
+.os-col-13 {
+  width: 13%;
+}
+
 .os-col-14 {
   width: 14%;
 }
@@ -1002,9 +1023,14 @@ h4.os-sub-section-title, h5.os-sub-section-title, h6.os-sub-section-title {
   width: 20%;
 }
 
+.os-col-23 {
+  width: 23%;
+}
+
 .os-col-25 {
   width: 25%;
 }
+
 .os-col-30 {
   width: 30%;
 }
@@ -1486,6 +1512,25 @@ form .form-group:empty {
   display: inline!important;
 }
 
+.os-select-container.disabled {
+  position: relative;
+}
+
+.os-select-container.disabled:before {
+  content: '';
+  position: absolute;
+  top: 0px;
+  bottom: 0px;
+  width: 100%;
+  z-index: 100;
+  background: transparent;
+  cursor: 'not-allowed';
+}
+
+.os-select-container.disabled .ui-select-toggle {
+  background: #eee;
+}
+
 .os-user-impersonate-warn {
   position: absolute;
   top: 40px;
@@ -1505,4 +1550,18 @@ form .form-group:empty {
 .os-user-impersonate-warn .text a {
   color: #fff;
   text-decoration: underline;
+}
+
+.list-group-item.not-first-item {
+  border-top-left-radius: 0px;
+  border-top-right-radius: 0px;
+}
+
+.list-group-item.not-last-item {
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
+}
+
+.form-group .tox-tinymce {
+  border-radius: 4px;
 }

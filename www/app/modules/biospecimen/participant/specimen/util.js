@@ -227,28 +227,13 @@ angular.module('os.biospecimen.specimen')
     function getSpecimens(labels, filterOpts, errorOpts) {
       filterOpts = filterOpts || {};
       filterOpts.label = labels;
+      filterOpts.maxResults = 1000;
 
-      if (getUrlLength(filterOpts) >= URL_LEN_LIMIT) {
-        Alerts.error("specimens.too_many_specimens");
-        return deferred(undefined);
-      }
-
-      return Specimen.query(filterOpts).then(
+      return Specimen.search(filterOpts).then(
         function(specimens) {
           return resolveSpecimens(labels, filterOpts.barcode, specimens, errorOpts);
         }
       );
-    }
-
-    function getUrlLength(filterOpts) {
-      var url = Specimen.url();
-      if (url.indexOf('http') != 0) {
-        var viewUrl = $location.absUrl();
-        url = viewUrl.substr(0, viewUrl.indexOf('#')) + url;
-      }
-
-      url += jQuery.param(filterOpts);
-      return url.length;
     }
 
     function deferred(resp) {
@@ -276,10 +261,15 @@ angular.module('os.biospecimen.specimen')
     function resolveSpecimens1(labels, attr, specimens, errorOpts) {
       var specimensMap = {};
       angular.forEach(specimens, function(spmn) {
-        if (!specimensMap[spmn[attr]]) {
-          specimensMap[spmn[attr]] = [spmn];
+        var key = spmn[attr];
+        if (key) {
+          key = key.toLowerCase();
+        }
+
+        if (!specimensMap[key]) {
+          specimensMap[key] = [spmn];
         } else {
-          specimensMap[spmn[attr]].push(spmn);
+          specimensMap[key].push(spmn);
         }
       });
 
@@ -291,7 +281,7 @@ angular.module('os.biospecimen.specimen')
 
       angular.forEach(labels, function(label) {
         var labelInfo = {label: label};
-        var spmns = specimensMap[label];
+        var spmns = specimensMap[label.toLowerCase()];
         if (!spmns) {
           notFoundLabels.push(label);
           return;
@@ -432,13 +422,21 @@ angular.module('os.biospecimen.specimen')
           hcfa = angular.isDefined(hcfa) && (hcfa === 'true' || hcfa === true);
 
           result.push({
+            hideTable: group.hideTable == true,
             multiple: true,
             title: group.title,
             fields: { table: group.fields },
             baseFields: baseFields,
             input: selectedSpmns,
             lastRow: angular.copy(selectedSpmns[selectedSpmns.length - 1]),
-            opts: angular.extend({static: true, enableCofrc: cofrc, cofrc: cofrc, hideCopyFirstToAll: hcfa}, otherOpts || {})
+            opts: angular.extend(
+              {
+                static: true,
+                enableCofrc: cofrc,
+                cofrc: cofrc,
+                hideCopyFirstToAll: hcfa
+              }, otherOpts || {}
+            )
           });
         }
       }
@@ -511,12 +509,12 @@ angular.module('os.biospecimen.specimen')
       }
 
       var expr = $parse(prop);
-      if (angular.isObject(value)) {
-        value = angular.copy(value);
-      }
-
       angular.forEach(descendants,
         function(descendant) {
+          if (angular.isObject(value)) {
+            value = angular.copy(value);
+          }
+
           expr.assign(descendant, value);
         }
       );

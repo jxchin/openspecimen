@@ -1,9 +1,9 @@
-<a ng-if="!!listViewCtx.sopDoc" class="btn default" ng-href="{{listViewCtx.sopDocDownloadUrl}}" target="_blank">
+<a ng-if="!!listViewCtx.sopDoc" class="btn default" ng-href="{{listViewCtx.sopDocDownloadUrl}}" target="_blank" rel="noopener">
   <span class="fa fa-download"></span>
   <span translate="cp.view_sop">View SOP</span>
 </a>
 
-<a ng-if="!!listViewCtx.sopUrl" class="btn default" ng-href="{{listViewCtx.sopUrl}}" target="_blank">
+<a ng-if="!!listViewCtx.sopUrl" class="btn default" ng-href="{{listViewCtx.sopUrl}}" target="_blank" rel="noopener">
   <span class="fa fa-external-link"></span>
   <span translate="cp.view_sop">View SOP</span>
 </a>
@@ -13,7 +13,9 @@
     <span translate="common.buttons.more">More</span>
     <span class="fa fa-caret-down"></span>
   </button>
-  <ul class="dropdown-menu dropdown-menu-right">
+  <ul class="dropdown-menu">
+    <os-plugin-hooks view-name="'participant-list'" sec-name="'more-menu-top'"></os-plugin-hooks>
+
     <li ng-if="listViewCtx.showImport">
       <a ui-sref="import-cp-objs">
         <span class="fa fa-upload"></span>
@@ -25,6 +27,13 @@
       <a ui-sref="import-cp-jobs">
         <span class="fa fa-list-alt"></span>
         <span translate="bulk_imports.view_jobs">View Past Imports</span>
+      </a>
+    </li>
+
+    <li ng-if="listViewCtx.mobileDataEntryEnabled && listViewCtx.showImport">
+      <a ui-sref="mobile-upload-jobs({cpId: cp.id})">
+        <span class="fa fa-upload"></span>
+        <span>Upload Mobile Data</span>
       </a>
     </li>
 

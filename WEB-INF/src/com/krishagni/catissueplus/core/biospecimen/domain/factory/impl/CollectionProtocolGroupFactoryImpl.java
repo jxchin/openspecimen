@@ -1,7 +1,9 @@
 package com.krishagni.catissueplus.core.biospecimen.domain.factory.impl;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -14,8 +16,10 @@ import com.krishagni.catissueplus.core.biospecimen.domain.factory.CpGroupErrorCo
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolGroupDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolSummary;
 import com.krishagni.catissueplus.core.biospecimen.repository.DaoFactory;
+import com.krishagni.catissueplus.core.common.errors.ActivityStatusErrorCode;
 import com.krishagni.catissueplus.core.common.errors.ErrorType;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
+import com.krishagni.catissueplus.core.common.util.Status;
 
 public class CollectionProtocolGroupFactoryImpl implements CollectionProtocolGroupFactory {
 
@@ -33,6 +37,7 @@ public class CollectionProtocolGroupFactoryImpl implements CollectionProtocolGro
 		group.setId(input.getId());
 		setName(input, group, ose);
 		setCps(input, group, ose);
+		setActivityStatus(input, group, ose);
 		ose.checkAndThrow();
 
 		return group;
@@ -52,8 +57,8 @@ public class CollectionProtocolGroupFactoryImpl implements CollectionProtocolGro
 			return;
 		}
 
-		List<Long> ids = new ArrayList<>();
-		List<String> shortTitles = new ArrayList<>();
+		Set<Long> ids = new HashSet<>();
+		Set<String> shortTitles = new HashSet<>();
 		for (CollectionProtocolSummary cp : input.getCps()) {
 			if (cp.getId() != null) {
 				ids.add(cp.getId());
@@ -83,11 +88,24 @@ public class CollectionProtocolGroupFactoryImpl implements CollectionProtocolGro
 		if (!shortTitles.isEmpty()) {
 			List<CollectionProtocol> cps = daoFactory.getCollectionProtocolDao().getCpsByShortTitle(shortTitles);
 			if (cps.size() != shortTitles.size()) {
-				shortTitles.removeAll(cps.stream().map(CollectionProtocol::getShortTitle).collect(Collectors.toSet()));
-				ose.addError(CpGroupErrorCode.CP_NOT_FOUND, String.join(",", shortTitles), shortTitles.size());
-			} else {
-				group.getCps().addAll(cps);
+				shortTitles.removeIf(st -> cps.stream().anyMatch(cp -> cp.getShortTitle().equalsIgnoreCase(st)));
+				if (!shortTitles.isEmpty()) {
+					ose.addError(CpGroupErrorCode.CP_NOT_FOUND, String.join(",", shortTitles), shortTitles.size());
+					return;
+				}
 			}
+
+			group.getCps().addAll(cps);
+		}
+	}
+
+	private void setActivityStatus(CollectionProtocolGroupDetail input, CollectionProtocolGroup group, OpenSpecimenException ose) {
+		if (StringUtils.isBlank(input.getActivityStatus())) {
+			group.setActivityStatus(Status.ACTIVITY_STATUS_ACTIVE.getStatus());
+		} else if (Status.isValidActivityStatus(input.getActivityStatus())) {
+			group.setActivityStatus(input.getActivityStatus());
+		} else {
+			ose.addError(ActivityStatusErrorCode.INVALID, input.getActivityStatus());
 		}
 	}
 }

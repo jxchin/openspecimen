@@ -20,6 +20,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.hibernate.SessionFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -45,6 +47,7 @@ import com.krishagni.catissueplus.core.biospecimen.domain.AliquotSpecimensRequir
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolRegistration;
+import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolSavedEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocolSite;
 import com.krishagni.catissueplus.core.biospecimen.domain.ConsentStatement;
 import com.krishagni.catissueplus.core.biospecimen.domain.CpConsentTier;
@@ -52,6 +55,7 @@ import com.krishagni.catissueplus.core.biospecimen.domain.CpReportSettings;
 import com.krishagni.catissueplus.core.biospecimen.domain.CpWorkflowConfig;
 import com.krishagni.catissueplus.core.biospecimen.domain.CpWorkflowConfig.Workflow;
 import com.krishagni.catissueplus.core.biospecimen.domain.DerivedSpecimenRequirement;
+import com.krishagni.catissueplus.core.biospecimen.domain.Participant;
 import com.krishagni.catissueplus.core.biospecimen.domain.Specimen;
 import com.krishagni.catissueplus.core.biospecimen.domain.SpecimenRequirement;
 import com.krishagni.catissueplus.core.biospecimen.domain.Visit;
@@ -66,6 +70,7 @@ import com.krishagni.catissueplus.core.biospecimen.domain.factory.SpecimenRequir
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.SrErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolEventDetail;
+import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolRegistrationDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CollectionProtocolSummary;
 import com.krishagni.catissueplus.core.biospecimen.events.ConsentTierDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.ConsentTierOp;
@@ -75,7 +80,6 @@ import com.krishagni.catissueplus.core.biospecimen.events.CopyCpeOpDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CpQueryCriteria;
 import com.krishagni.catissueplus.core.biospecimen.events.CpReportSettingsDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.CpWorkflowCfgDetail;
-import com.krishagni.catissueplus.core.biospecimen.events.CprSummary;
 import com.krishagni.catissueplus.core.biospecimen.events.FileDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.MergeCpDetail;
 import com.krishagni.catissueplus.core.biospecimen.events.SpecimenPoolRequirements;
@@ -101,6 +105,8 @@ import com.krishagni.catissueplus.core.common.events.DependentEntityDetail;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
 import com.krishagni.catissueplus.core.common.service.ObjectAccessor;
+import com.krishagni.catissueplus.core.common.service.StarredItemService;
+import com.krishagni.catissueplus.core.common.service.impl.EventPublisher;
 import com.krishagni.catissueplus.core.common.util.AuthUtil;
 import com.krishagni.catissueplus.core.common.util.ConfigUtil;
 import com.krishagni.catissueplus.core.common.util.EmailUtil;
@@ -108,10 +114,15 @@ import com.krishagni.catissueplus.core.common.util.MessageUtil;
 import com.krishagni.catissueplus.core.common.util.NotifUtil;
 import com.krishagni.catissueplus.core.common.util.Status;
 import com.krishagni.catissueplus.core.common.util.Utility;
+import com.krishagni.catissueplus.core.de.domain.DeObject;
+import com.krishagni.catissueplus.core.exporter.domain.ExportJob;
+import com.krishagni.catissueplus.core.exporter.services.ExportService;
+import com.krishagni.catissueplus.core.init.AppProperties;
 import com.krishagni.catissueplus.core.query.Column;
 import com.krishagni.catissueplus.core.query.ListConfig;
 import com.krishagni.catissueplus.core.query.ListDetail;
 import com.krishagni.catissueplus.core.query.ListService;
+import com.krishagni.catissueplus.core.query.Row;
 import com.krishagni.rbac.common.errors.RbacErrorCode;
 import com.krishagni.rbac.events.SubjectRoleOpNotif;
 import com.krishagni.rbac.service.RbacService;
@@ -133,6 +144,12 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 	private ListService listSvc;
 
 	private CpReportSettingsFactory rptSettingsFactory;
+
+	private SessionFactory sessionFactory;
+
+	private StarredItemService starredItemSvc;
+
+	private ExportService exportSvc;
 
 	public void setTaskExecutor(ThreadPoolTaskExecutor taskExecutor) {
 		this.taskExecutor = taskExecutor;
@@ -164,6 +181,18 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 
 	public void setRptSettingsFactory(CpReportSettingsFactory rptSettingsFactory) {
 		this.rptSettingsFactory = rptSettingsFactory;
+	}
+
+	public void setSessionFactory(SessionFactory sessionFactory) {
+		this.sessionFactory = sessionFactory;
+	}
+
+	public void setStarredItemSvc(StarredItemService starredItemSvc) {
+		this.starredItemSvc = starredItemSvc;
+	}
+
+	public void setExportSvc(ExportService exportSvc) {
+		this.exportSvc = exportSvc;
 	}
 
 	@Override
@@ -235,14 +264,35 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 
 	@Override
 	@PlusTransactional
-	public ResponseEvent<List<CprSummary>> getRegisteredParticipants(RequestEvent<CprListCriteria> req) {
-		try { 
+	public ResponseEvent<List<CollectionProtocolRegistrationDetail>> getRegisteredParticipants(RequestEvent<CprListCriteria> req) {
+		try {
 			CprListCriteria listCrit = addCprListCriteria(req.getPayload());
 			if (listCrit == null) {
 				return ResponseEvent.response(Collections.emptyList());
 			}
 
-			return ResponseEvent.response(daoFactory.getCprDao().getCprList(listCrit));
+			List<CollectionProtocolRegistration> cprs = daoFactory.getCprDao().getCprs(listCrit);
+			createExtensions(cprs);
+
+			Map<CollectionProtocol, Boolean> phiAccess = new HashMap<>();
+			List<CollectionProtocolRegistrationDetail> result = new ArrayList<>();
+			for (CollectionProtocolRegistration cpr : cprs) {
+				boolean includePhi = listCrit.includePhi();
+				if (includePhi && CollectionUtils.isNotEmpty(listCrit.phiSiteCps())) {
+					CollectionProtocol cp = cpr.getCollectionProtocol();
+					if (!phiAccess.containsKey(cp)) {
+						phiAccess.put(cp, AccessCtrlMgr.getInstance().isAccessAllowed(listCrit.phiSiteCps(), cp));
+					}
+
+					includePhi = phiAccess.get(cp);
+				}
+
+				result.add(CollectionProtocolRegistrationDetail.from(cpr, !includePhi));
+			}
+
+			return ResponseEvent.response(result);
+		} catch (OpenSpecimenException ose) {
+			return ResponseEvent.error(ose);
 		} catch (Exception e) {
 			return ResponseEvent.serverError(e);
 		}
@@ -269,6 +319,7 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 		try {
 			CollectionProtocol cp = createCollectionProtocol(req.getPayload(), null, false);
 			notifyUsersOnCpCreate(cp);
+			EventPublisher.getInstance().publish(new CollectionProtocolSavedEvent(cp));
 			return ResponseEvent.response(CollectionProtocolDetail.from(cp));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
@@ -319,6 +370,7 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 			// PI and coordinators role handling
 			addOrRemovePiCoordinatorRoles(cp, "UPDATE", oldPi, cp.getPrincipalInvestigator(), addedCoord, removedCoord);
 			notifyUsersOnCpUpdate(existingCp, addedSites, removedSites);
+			EventPublisher.getInstance().publish(new CollectionProtocolSavedEvent(existingCp));
 			return ResponseEvent.response(CollectionProtocolDetail.from(existingCp));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
@@ -342,6 +394,7 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 			
 			CollectionProtocol cp = createCollectionProtocol(opDetail.getCp(), existing, true);
 			notifyUsersOnCpCreate(cp);
+			EventPublisher.getInstance().publish(new CollectionProtocolSavedEvent(cp));
 			return ResponseEvent.response(CollectionProtocolDetail.from(cp));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
@@ -392,6 +445,7 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 			}
 
 			existingCp.setConsentsWaived(detail.getConsentsWaived());
+			EventPublisher.getInstance().publish(new CollectionProtocolSavedEvent(existingCp));
 			return ResponseEvent.response(CollectionProtocolDetail.from(existingCp));
 		} catch (OpenSpecimenException ose) {
 			return ResponseEvent.error(ose);
@@ -429,6 +483,7 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 
 			for (CollectionProtocol cp : cps) {
 				AccessCtrlMgr.getInstance().ensureDeleteCpRights(cp);
+				ensureUserUpdateRights(cp);
 			}
 
 			boolean completed = crit.isForceDelete() ? forceDeleteCps(cps, crit.getReason()) : deleteCps(cps, crit.getReason());
@@ -504,6 +559,7 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 	public ResponseEvent<CollectionProtocolDetail> importCollectionProtocol(RequestEvent<CollectionProtocolDetail> req) {
 		try {
 			CollectionProtocolDetail cpDetail = req.getPayload();
+			cpDetail.setDistributionProtocols(null);
 			
 			ResponseEvent<CollectionProtocolDetail> resp = createCollectionProtocol(req);
 			resp.throwErrorIfUnsuccessful();
@@ -1188,6 +1244,32 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 	}
 
 	@Override
+	@PlusTransactional
+	public boolean toggleStarredCp(Long cpId, boolean starred) {
+		try {
+			CollectionProtocol cp = daoFactory.getCollectionProtocolDao().getById(cpId);
+			if (cp == null) {
+				throw OpenSpecimenException.userError(CpErrorCode.NOT_FOUND, cpId);
+			}
+
+			AccessCtrlMgr.getInstance().ensureReadCpRights(cp);
+			if (starred) {
+				starredItemSvc.save(getObjectName(), cp.getId());
+			} else {
+				starredItemSvc.delete(getObjectName(), cp.getId());
+			}
+
+			return true;
+		} catch (Exception e) {
+			if (e instanceof OpenSpecimenException) {
+				throw e;
+			}
+
+			throw OpenSpecimenException.serverError(e);
+		}
+	}
+
+	@Override
 	public String getObjectName() {
 		return CollectionProtocol.getEntityName();
 	}
@@ -1215,8 +1297,12 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 
 	@Override
 	public void afterPropertiesSet() throws Exception {
+		listSvc.registerListConfigurator("cp-list-view", this::getCpListConfig);
 		listSvc.registerListConfigurator("participant-list-view", this::getParticipantsListConfig);
 		listSvc.registerListConfigurator("specimen-list-view", this::getSpecimenListConfig);
+
+		exportSvc.registerObjectsGenerator("cpe", this::getEventsGenerator);
+		exportSvc.registerObjectsGenerator("sr", this::getSpecimenRequirementsGenerator);
 	}
 
 
@@ -1793,6 +1879,17 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 		}
 	}
 
+	private void ensureUserUpdateRights(CollectionProtocol cp) {
+		try {
+			AccessCtrlMgr.getInstance().ensureCreateUpdateUserRolesRights(cp.getPrincipalInvestigator(), null);
+			for (User coord : cp.getCoordinators()) {
+				AccessCtrlMgr.getInstance().ensureCreateUpdateUserRolesRights(coord, null);
+			}
+		} catch (OpenSpecimenException ose) {
+			ose.rethrow(RbacErrorCode.ACCESS_DENIED, CpErrorCode.USER_UPDATE_RIGHTS_REQUIRED);
+		}
+	}
+
 	private boolean forceDeleteCps(final List<CollectionProtocol> cps, final String reason)
 	throws Exception {
 		final Authentication auth = AuthUtil.getAuth();
@@ -1837,16 +1934,17 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 			// if in same transaction, then it will be obtained from session
 			//
 			cp = daoFactory.getCollectionProtocolDao().getById(cp.getId());
+			BeanUtils.copyProperties(cp, deletedCp);
 
 			removeContainerRestrictions(cp);
 			addOrRemovePiCoordinatorRoles(cp, "DELETE", cp.getPrincipalInvestigator(), null, null, cp.getCoordinators());
 			removeCpRoles(cp);
-			BeanUtils.copyProperties(cp, deletedCp);
 
 			cp.setOpComments(reason);
 			cp.delete();
 
 			DeleteLogUtil.getInstance().log(cp);
+			EventPublisher.getInstance().publish(new CollectionProtocolSavedEvent(cp));
 			success = true;
 		} catch (Exception ex) {
 			stackTrace = ExceptionUtils.getStackTrace(ex);
@@ -2035,6 +2133,97 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 		return cfg;
 	}
 
+	private ListConfig getCpListConfig(Map<String, Object> listReq) {
+		ListConfig cfg = getListConfig(listReq, "cp-list-view", "CollectionProtocol");
+		if (cfg == null) {
+			return null;
+		}
+
+		List<Column> hiddenColumns = new ArrayList<>();
+		Column id = new Column();
+		id.setExpr("CollectionProtocol.id");
+		id.setCaption("cpId");
+		cfg.setPrimaryColumn(id);
+		hiddenColumns.add(id);
+
+		Column catalogId = new Column();
+		catalogId.setExpr("CollectionProtocol.catalogId");
+		catalogId.setCaption("catalogId");
+		hiddenColumns.add(catalogId);
+
+		Column starred = new Column();
+		starred.setExpr("CollectionProtocol.__userLabels.userId");
+		starred.setCaption("starred");
+		starred.setDirection(isOracle() ? "asc" : "desc");
+		hiddenColumns.add(starred);
+		cfg.setHiddenColumns(hiddenColumns);
+
+		List<Column> fixedColumns = new ArrayList<>();
+		Column participantsCount = new Column();
+		participantsCount.setCaption("Participants");
+		participantsCount.setExpr("count(Participant.id)");
+		fixedColumns.add(participantsCount);
+
+		Column specimensCount = new Column();
+		specimensCount.setCaption("Specimens");
+		specimensCount.setExpr("count(Specimen.id)");
+		fixedColumns.add(specimensCount);
+		cfg.setFixedColumns(fixedColumns);
+
+		cfg.setFixedColumnsGenerator(
+			(rows) -> {
+				if (rows == null || rows.isEmpty()) {
+					return rows;
+				}
+
+				Map<Long, Row> cpRows = new HashMap<>();
+				for (Row row : rows) {
+					Long cpId = Long.parseLong((String) row.getHidden().get("cpId"));
+					cpRows.put(cpId, row);
+				}
+
+				List<Object[]> dbRows = sessionFactory.getCurrentSession()
+					.getNamedQuery(CollectionProtocol.class.getName() + ".getParticipantAndSpecimenCount")
+					.setParameterList("cpIds", cpRows.keySet())
+					.list();
+
+				for (Object[] dbRow : dbRows) {
+					int idx = -1;
+					Long cpId = ((Number) dbRow[++idx]).longValue();
+					cpRows.get(cpId).setFixedData(new Object[] {dbRow[++idx], dbRow[++idx]});
+				}
+
+				return rows;
+			}
+		);
+
+		List<Column> orderBy = cfg.getOrderBy();
+		if (orderBy == null) {
+			orderBy = new ArrayList<>();
+			cfg.setOrderBy(orderBy);
+		}
+		orderBy.add(0, starred);
+
+		cfg.setRestriction(String.format(USR_LABELS_RESTRICTION, AuthUtil.getCurrentUser().getId()));
+
+		Set<SiteCpPair> cpSites = AccessCtrlMgr.getInstance().getReadableSiteCps();
+		if (cpSites == null) {
+			return cfg;
+		}
+
+		if (cpSites.isEmpty()) {
+			throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
+		}
+
+		String cpSitesRestriction = BiospecimenDaoHelper.getInstance().getSiteCpsCondAqlForCps(cpSites);
+		if (StringUtils.isNotBlank(cpSitesRestriction)) {
+			cfg.setRestriction(String.format(AND_COND, cfg.getRestriction(), cpSitesRestriction));
+			cfg.setDistinct(true);
+		}
+
+		return cfg;
+	}
+
 	private ListConfig getParticipantsListConfig(Map<String, Object> listReq) {
 		ListConfig cfg = getListConfig(listReq, "participant-list-view", "Participant");
 		if (cfg == null) {
@@ -2087,7 +2276,11 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 	private Workflow getWorkFlow(Long cpId, String name) {
 		Workflow workflow = null;
 
-		CpWorkflowConfig cfg = daoFactory.getCollectionProtocolDao().getCpWorkflows(cpId);
+		CpWorkflowConfig cfg = null;
+		if (cpId != null) {
+			cfg = daoFactory.getCollectionProtocolDao().getCpWorkflows(cpId);
+		}
+
 		if (cfg != null) {
 			workflow = cfg.getWorkflows().get(name);
 		}
@@ -2142,6 +2335,78 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 		return stmt;
 	}
 
+	private boolean isOracle() {
+		String dbType = AppProperties.getInstance().getProperties()
+			.getProperty("database.type", "mysql")
+			.toLowerCase();
+		return dbType.equalsIgnoreCase("oracle");
+	}
+
+	private void createExtensions(List<CollectionProtocolRegistration> cprs) {
+		Map<CollectionProtocol, List<CollectionProtocolRegistration>> cpRegs = new HashMap<>();
+		cprs.forEach(cpr -> cpRegs.computeIfAbsent(cpr.getCollectionProtocol(), (k) -> new ArrayList<>()).add(cpr));
+		cpRegs.forEach((cp, regs) ->
+			DeObject.createExtensions(
+				true, Participant.EXTN, cp.getId(),
+				regs.stream().map(CollectionProtocolRegistration::getParticipant).collect(Collectors.toList())
+			)
+		);
+	}
+
+	private Function<ExportJob, List<? extends Object>> getEventsGenerator() {
+		return new Function<ExportJob, List<? extends Object>>() {
+			private boolean endOfEvents;
+
+			@Override
+			public List<CollectionProtocolEventDetail> apply(ExportJob job) {
+				String cpIdStr = job.param("cpId");
+				if (endOfEvents || StringUtils.isBlank(cpIdStr)) {
+					return Collections.emptyList();
+				}
+
+				Long cpId = Long.parseLong(cpIdStr);
+				CollectionProtocol cp = daoFactory.getCollectionProtocolDao().getById(cpId);
+
+				endOfEvents = true;
+				return CollectionProtocolEventDetail.from(cp.getOrderedCpeList(), false);
+			}
+		};
+	}
+
+	private Function<ExportJob, List<? extends Object>> getSpecimenRequirementsGenerator() {
+		return new Function<ExportJob, List<? extends Object>>() {
+			private boolean endOfSrs;
+
+			@Override
+			public List<SpecimenRequirementDetail> apply(ExportJob job) {
+				String cpIdStr = job.param("cpId");
+				if (endOfSrs || StringUtils.isBlank(cpIdStr)) {
+					return Collections.emptyList();
+				}
+
+				Long cpId = Long.parseLong(cpIdStr);
+				CollectionProtocol cp = daoFactory.getCollectionProtocolDao().getById(cpId);
+
+				List<SpecimenRequirementDetail> result = new ArrayList<>();
+				for (CollectionProtocolEvent cpe : cp.getOrderedCpeList()) {
+					List<SpecimenRequirement> parents = new ArrayList<>(cpe.getOrderedTopLevelAnticipatedSpecimens());
+					while (!parents.isEmpty()) {
+						SpecimenRequirement sr = parents.remove(0);
+						parents.addAll(0, sr.getOrderedChildRequirements());
+
+						SpecimenRequirementDetail detail = SpecimenRequirementDetail.from(sr, false);
+						detail.setCpShortTitle(cp.getShortTitle());
+						detail.setEventLabel(cpe.getEventLabel());
+						result.add(detail);
+					}
+				}
+
+				endOfSrs = true;
+				return result;
+			}
+		};
+	}
+
 	private static final String PPID_MSG                     = "cp_ppid";
 
 	private static final String VISIT_NAME_MSG               = "cp_visit_name";
@@ -2166,6 +2431,8 @@ public class CollectionProtocolServiceImpl implements CollectionProtocolService,
 
 	private static final int OP_CP_DELETED = 2;
 
-	private static final String INSTITUTE_SITES_SQL =
-			"select identifier from catissue_site where institute_id in (%s) and activity_status != 'Disabled'";
+	private static final String USR_LABELS_RESTRICTION =
+		"(CollectionProtocol.__userLabels.userId not exists or CollectionProtocol.__userLabels.userId = %d)";
+
+	private static final String AND_COND = "(%s) and (%s)";
 }

@@ -15,14 +15,20 @@ import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.util.ReflectionUtils;
 
 import com.krishagni.catissueplus.core.administrative.domain.User;
+import com.krishagni.catissueplus.core.common.Pair;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
 import com.krishagni.catissueplus.core.common.util.MessageUtil;
 import com.krishagni.catissueplus.core.common.util.Utility;
 
 public abstract class LabelPrintRule {
+	private static final String DEF_LINE_ENDING = "LF";
+
+	private static final String DEF_FILE_EXTN = "txt";
+
 	public enum CmdFileFmt {
 		CSV("csv"),
-		KEY_VALUE("key-value");
+		KEY_VALUE("key-value"),
+		KEY_Q_VALUE("key-q-value");
 
 		private String fmt;
 
@@ -53,9 +59,13 @@ public abstract class LabelPrintRule {
 
 	private String labelDesign;
 
-	private List<LabelTmplToken> dataTokens = new ArrayList<>();
-	
+	private List<Pair<LabelTmplToken, List<String>>> dataTokens = new ArrayList<>();
+
 	private CmdFileFmt cmdFileFmt = CmdFileFmt.KEY_VALUE;
+
+	private String lineEnding;
+
+	private String fileExtn;
 
 	public String getLabelType() {
 		return labelType;
@@ -72,7 +82,6 @@ public abstract class LabelPrintRule {
 	public void setIpAddressMatcher(IpAddressMatcher ipAddressMatcher) {
 		this.ipAddressMatcher = ipAddressMatcher;
 	}
-
 
 	public void setUserLogin(User user) {
 		users = new ArrayList<>();
@@ -113,11 +122,11 @@ public abstract class LabelPrintRule {
 		this.labelDesign = labelDesign;
 	}
 
-	public List<LabelTmplToken> getDataTokens() {
+	public List<Pair<LabelTmplToken, List<String>>> getDataTokens() {
 		return dataTokens;
 	}
 
-	public void setDataTokens(List<LabelTmplToken> dataTokens) {
+	public void setDataTokens(List<Pair<LabelTmplToken, List<String>>> dataTokens) {
 		this.dataTokens = dataTokens;
 	}
 
@@ -134,6 +143,22 @@ public abstract class LabelPrintRule {
 		if (this.cmdFileFmt == null) {
 			throw new IllegalArgumentException("Invalid command file format: " + fmt);
 		}
+	}
+
+	public String getLineEnding() {
+		return StringUtils.isNotBlank(lineEnding) ? lineEnding : DEF_LINE_ENDING;
+	}
+
+	public void setLineEnding(String lineEnding) {
+		this.lineEnding = lineEnding;
+	}
+
+	public String getFileExtn() {
+		return StringUtils.isNotBlank(fileExtn) ? fileExtn : DEF_FILE_EXTN;
+	}
+
+	public void setFileExtn(String fileExtn) {
+		this.fileExtn = fileExtn;
 	}
 
 	public boolean isApplicableFor(User user, String ipAddr) {
@@ -165,8 +190,19 @@ public abstract class LabelPrintRule {
 				dataItems.put(getMessageStr("PRINTER"), printerName);
 			}
 			
-			for (LabelTmplToken token : dataTokens) {
-				dataItems.put(getMessageStr(token.getName()), token.getReplacement(printItem.getObject()));
+			for (Pair<LabelTmplToken, List<String>> tokenArgs : dataTokens) {
+				LabelTmplToken token = tokenArgs.first();
+				List<String> args = tokenArgs.second();
+
+				String name = token.getName().toLowerCase();
+				if (args.size() > 1 && (name.equals("eval") || name.equals("custom_field"))) {
+					name = args.get(0).replaceAll("^\"|\"$", "");
+					args = args.subList(1, args.size());
+				} else {
+					name = getMessageStr(name);
+				}
+
+				dataItems.put(name, token.getReplacement(printItem.getObject(), args.toArray(new String[0])));
 			}
 
 			return dataItems;
@@ -180,10 +216,13 @@ public abstract class LabelPrintRule {
 		result.append("label design = ").append(getLabelDesign())
 			.append(", label type = ").append(getLabelType())
 			.append(", user = ").append(getUsersList(true))
-			.append(", printer = ").append(getPrinterName());
+			.append(", printer = ").append(getPrinterName())
+			.append(", line ending = ").append(getLineEnding())
+			.append(", file extension = ").append(getFileExtn());
 
 		String tokens = getDataTokens().stream()
-			.map(token -> token.getName())
+			.map(Pair::first)
+			.map(LabelTmplToken::getName)
 			.collect(Collectors.joining(";"));
 		result.append(", tokens = ").append(tokens);
 		return result.toString();
@@ -202,8 +241,10 @@ public abstract class LabelPrintRule {
 			rule.put("printerName", getPrinterName());
 			rule.put("cmdFilesDir", getCmdFilesDir());
 			rule.put("labelDesign", getLabelDesign());
-			rule.put("dataTokens", getTokenNames());
+			rule.put("dataTokens", getTokens());
 			rule.put("cmdFileFmt", getCmdFileFmt().fmt);
+			rule.put("lineEnding", getLineEnding());
+			rule.put("fileExtn", getFileExtn());
 			rule.putAll(getDefMap(ufn));
 			return rule;
 		} catch (Exception e) {
@@ -221,8 +262,23 @@ public abstract class LabelPrintRule {
 		return MessageUtil.getInstance().getMessage("print_" + name, null);
 	}
 
-	private String getTokenNames() {
-		return dataTokens.stream().map(LabelTmplToken::getName).collect(Collectors.joining(","));
+	private String getTokens() {
+		StringBuilder tokenStr = new StringBuilder();
+		for (Pair<LabelTmplToken, List<String>> tokenArgs : dataTokens) {
+			if (tokenStr.length() > 0) {
+				tokenStr.append(",");
+			}
+
+			LabelTmplToken token = tokenArgs.first();
+			List<String> args = tokenArgs.second();
+
+			tokenStr.append(token.getName());
+			if (args != null && !args.isEmpty()) {
+				tokenStr.append("(").append(String.join(",", args)).append(")");
+			}
+		}
+
+		return tokenStr.toString();
 	}
 
 	private String getIpAddressRange(IpAddressMatcher ipRange) {

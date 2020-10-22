@@ -4,7 +4,7 @@
       <a ui-sref="home">
         <img src="images/os_logo.png"></img>
       </a>
-      <a class="deploy-logo" href="{{global.siteAssets.siteUrl}}" ng-if="global.siteAssets.siteLogo" target="_blank">
+      <a class="deploy-logo" href="{{global.siteAssets.siteUrl}}" ng-if="global.siteAssets.siteLogo" target="_blank" rel="noopener">
         <img src="{{global.siteAssets.siteLogo}}"></img>
       </a>
       <div class="deploy-env" ng-if="!!global.appProps.deploy_env">
@@ -14,13 +14,15 @@
     <div class="search">
       <div ng-include src="'modules/common/search/search.html'"></div>
     </div>
-    <ul class="menu">
+    <ul class="menu" ng-class="{'os-hide-nav-buttons': global.hideNavButtons}">
       <li class="dropdown" dropdown os-tooltip="{{'common.tooltip.user_profile' | translate}}">
-        <a class="dropdown-toggle">
-          <span class="fa fa-user"></span>
-        </a>
+        <a class="dropdown-toggle" os-letter-avatar name="userCtx.name" style="margin-top: -7px;"></a>
         <ul class="dropdown-menu dropdown-menu-right" role="menu">
-          <li><a>{{currentUser | osUserDisplayName}}</a></li>
+          <li>
+            <a ui-sref="user-edit-profile">
+              <span>{{currentUser | osUserDisplayName}}</span>
+            </a>
+          </li>
           <li class="divider"></li>
           <li ng-if="currentUser.domain == global.defaultDomain">
             <a ui-sref="user-password({userId: currentUser.id})">
@@ -28,7 +30,14 @@
             </a>
           </li>
           <li class="divider"></li>
-          <li><a ui-sref="login({logout:true})"  translate="user.logout">Log Out</a></li>
+          <li ng-switch on="userCtx.samlEnabled && userCtx.sloEnabled">
+            <a ng-switch-when="true" href="saml/logout">
+              <span translate="user.logout">Logout</span>
+            </a>
+            <a ng-switch-when="false" ui-sref="login({logout: true})">
+              <span translate="user.logout">Logout</span>
+            </a>
+          </li>
         </ul>
       </li>
       <li class="dropdown" dropdown is-open="ctx.notifsOpen" ng-controller="NotifAlertCtrl"
@@ -43,18 +52,18 @@
           </li>
         </ul>
       </li>
-      <li class="dropdown" dropdown os-tooltip="{{'common.tooltip.online_help' | translate}}">
+      <li class="dropdown info" dropdown os-tooltip="{{'common.tooltip.online_help' | translate}}">
         <a class="dropdown-toggle">
           <span class="fa fa-question-circle"></span>
         </a>
         <ul class="dropdown-menu dropdown-menu-right" role="menu">
           <li>
-            <a href="{{userCtx.helpUrl}}" target="_blank">
+            <a href="{{userCtx.helpUrl}}" target="_blank" rel="noopener">
               <span translate="common.online_help">Online Help</span>
             </a>
           </li>
           <li>
-            <a href="{{userCtx.forumUrl}}" target="_blank">
+            <a href="{{userCtx.forumUrl}}" target="_blank" rel="noopener">
               <span translate="common.qa_forums">Q & A Forums</span>
             </a>
           </li>

@@ -1,13 +1,20 @@
 
 angular.module('os.administrative.job.list', ['os.administrative.models'])
   .controller('JobListCtrl', function(
-    $scope, $modal, $translate, $state,
+    $scope, $modal, $translate, $state, currentUser,
     Util, ScheduledJob, DeleteUtil, Alerts, ListPagerOpts) {
 
     var pagerOpts, filterOpts;
 
     function init() {
       $scope.jobs = [];
+      $scope.emptyState = {
+        empty: true,
+        loading: true,
+        loadingMessage: 'jobs.loading_list',
+        emptyMessage: 'jobs.empty_list'
+      };
+
       pagerOpts = $scope.pagerOpts = new ListPagerOpts({listSizeGetter: getJobsCount});
       filterOpts = $scope.filterOpts = {query: undefined, maxResults: pagerOpts.recordsPerPage + 1};
 
@@ -17,8 +24,18 @@ angular.module('os.administrative.job.list', ['os.administrative.models'])
     }
 
     function loadJobs(filterOpts) {
+      $scope.emptyState.loading = true;
       ScheduledJob.query(filterOpts).then(
         function(jobs) {
+          $scope.emptyState.loading = false;
+          $scope.emptyState.empty = jobs.length <= 0;
+
+          angular.forEach(jobs,
+            function(job) {
+              job.$$editAllowed = currentUser.admin || job.createdBy.id == currentUser.id;
+            }
+          );
+
           $scope.jobs = jobs;
           pagerOpts.refreshOpts(jobs);
         }

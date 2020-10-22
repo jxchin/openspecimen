@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.Writer;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.krishagni.catissueplus.core.administrative.repository.FormListCriteria;
+import com.krishagni.catissueplus.core.auth.domain.UserRequestData;
 import com.krishagni.catissueplus.core.common.events.BulkDeleteEntityOp;
 import com.krishagni.catissueplus.core.common.events.DependentEntityDetail;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
@@ -40,9 +42,11 @@ import com.krishagni.catissueplus.core.de.events.FormSummary;
 import com.krishagni.catissueplus.core.de.events.GetFormFieldPvsOp;
 import com.krishagni.catissueplus.core.de.events.GetFormRecordsListOp;
 import com.krishagni.catissueplus.core.de.events.ListFormFields;
+import com.krishagni.catissueplus.core.de.events.MoveFormRecordsOp;
 import com.krishagni.catissueplus.core.de.events.RemoveFormContextOp;
 import com.krishagni.catissueplus.core.de.events.RemoveFormContextOp.RemoveType;
 import com.krishagni.catissueplus.core.de.services.FormService;
+
 import edu.common.dynamicextensions.domain.nui.Container;
 import edu.common.dynamicextensions.domain.nui.PermissibleValue;
 import edu.common.dynamicextensions.napi.FormData;
@@ -258,7 +262,7 @@ public class FormsController {
 	public Map<String, Object> saveFormData(
 		@PathVariable("id")
 		Long formId,
-			
+
 		@RequestBody
 		Map<String, Object> valueMap) {
 		return saveOrUpdateFormData(formId, valueMap);
@@ -295,13 +299,8 @@ public class FormsController {
 		@RequestBody
 		List<FormContextDetail> formCtxts) {
 		
-		for (FormContextDetail formCtxt : formCtxts) {
-			formCtxt.setFormId(formId);
-		}
-		
-		ResponseEvent<List<FormContextDetail>> resp = formSvc.addFormContexts(getRequest(formCtxts));
-		resp.throwErrorIfUnsuccessful();
-		return resp.getPayload();
+		formCtxts.forEach(fc -> fc.setFormId(formId));
+		return ResponseEvent.unwrap(formSvc.addFormContexts(RequestEvent.wrap(formCtxts)));
 	}
 	
 	@RequestMapping(method = RequestMethod.DELETE, value="{id}/contexts")
@@ -311,10 +310,10 @@ public class FormsController {
 		@PathVariable("id")
 		Long formId,
 			
-		@RequestParam(value = "entityType", required = true)
+		@RequestParam(value = "entityType")
 		String entityType,
 			
-		@RequestParam(value = "cpId", required = true)
+		@RequestParam(value = "cpId")
 		Long cpId) {
 		
 		RemoveFormContextOp op = new RemoveFormContextOp();
@@ -322,10 +321,7 @@ public class FormsController {
 		op.setFormId(formId);
 		op.setEntityType(entityType);
 		op.setRemoveType(RemoveType.SOFT_REMOVE);
-
-		ResponseEvent<Boolean> resp = formSvc.removeFormContext(getRequest(op));
-		resp.throwErrorIfUnsuccessful();
-		return Collections.<String, Object>singletonMap("status", resp.getPayload());
+		return Collections.singletonMap("status", ResponseEvent.unwrap(formSvc.removeFormContext(RequestEvent.wrap(op))));
     }
 	
 	@RequestMapping(method = RequestMethod.GET, value = "/{id}/records")
@@ -473,7 +469,21 @@ public class FormsController {
 		return resp.getPayload();
 	}
 
-	private Map<String, Object> saveOrUpdateFormData(Long formId, Map<String, Object> valueMap) {		
+	@RequestMapping(method = RequestMethod.PUT, value="/move-records")
+	@ResponseStatus(HttpStatus.OK)
+	@ResponseBody
+	public Map<String, Integer> moveRecords(@RequestBody MoveFormRecordsOp input) {
+		return Collections.singletonMap("count", ResponseEvent.unwrap(formSvc.moveRecords(RequestEvent.wrap(input))));
+	}
+
+	private Map<String, Object> saveOrUpdateFormData(Long formId, Map<String, Object> valueMap) {
+		Map<String, Object> appData = (Map<String, Object>) valueMap.computeIfAbsent(
+			"appData",
+			(k) -> new HashMap<String, Object>()
+		);
+		appData.putAll(UserRequestData.getInstance().getData());
+		boolean includeMetadata = Boolean.TRUE.equals(appData.get("includeMetadata"));
+
 		FormData formData = FormData.fromValueMap(formId, valueMap);
 		
 		FormDataDetail detail = new FormDataDetail();
@@ -483,7 +493,15 @@ public class FormsController {
 		
 		ResponseEvent<FormDataDetail> resp = formSvc.saveFormData(getRequest(detail));
 		resp.throwErrorIfUnsuccessful();
-		return resp.getPayload().getFormData().getFieldNameValueMap(formData.isUsingUdn());
+
+		formData.getAppData().put("nextSurveyToken", UserRequestData.getInstance().getDataItem("nextSurveyToken"));
+		formData.getAppData().entrySet().removeIf(kv -> kv.getKey().startsWith("$"));
+
+		if (includeMetadata) {
+			return resp.getPayload().getFormData().getFieldValueMap();
+		} else {
+			return resp.getPayload().getFormData().getFieldNameValueMap(formData.isUsingUdn());
+		}
 	}
 
 	private String zipFiles(String dir) {

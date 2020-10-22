@@ -30,6 +30,11 @@
       <attribute>defReceivingSiteName</attribute>
     </field>
 
+    <field>
+      <caption>#getMessage("dp_activity_status")</caption>
+      <attribute>activityStatus</attribute>
+    </field>
+
     <record>
       <attribute>principalInvestigator</attribute>
       <caption>#getMessage("dp_pi")</caption>
@@ -57,13 +62,13 @@
     </field>
 
     <field>
-      <type>date</type>
+      <type>dateOnly</type>
       <caption>#getMessage("dp_start_date")</caption>
       <attribute>startDate</attribute>
     </field>
 
     <field>
-      <type>date</type>
+      <type>dateOnly</type>
       <caption>#getMessage("dp_end_date")</caption>
       <attribute>endDate</attribute>
     </field>

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.krishagni.catissueplus.core.de.domain.DeObject;
 import com.krishagni.catissueplus.core.de.domain.DeObject.Attr;
+import com.krishagni.catissueplus.core.exporter.services.impl.ExporterContextHolder;
 
 public class ExtensionDetail implements Serializable {
 	private Long id;
@@ -26,6 +27,8 @@ public class ExtensionDetail implements Serializable {
 	private List<AttrDetail> attrs = new ArrayList<>();
 
 	private Map<String, Object> attrsMap;
+
+	private boolean useUdn;
 	
 	public Long getId() {
 		return id;
@@ -90,7 +93,15 @@ public class ExtensionDetail implements Serializable {
 
 		return attrsMap;
 	}
-	
+
+	public boolean isUseUdn() {
+		return useUdn;
+	}
+
+	public void setUseUdn(boolean useUdn) {
+		this.useUdn = useUdn;
+	}
+
 	public static ExtensionDetail from(DeObject extension) {
 		return from(extension, true);
 	}
@@ -130,6 +141,8 @@ public class ExtensionDetail implements Serializable {
 					attrsMap.put(attr.getName(), sfAttrsMap);
 				}
 			} else if ("fileUpload".equals(attr.getType()) || attr.getValue() instanceof List) {
+				attrsMap.put(attr.getName(), attr.getValue());
+			} else if ("datePicker".equals(attr.getType()) && ExporterContextHolder.getInstance().isExportOp()) {
 				attrsMap.put(attr.getName(), attr.getValue());
 			} else {
 				Object value = attr.getDisplayValue();

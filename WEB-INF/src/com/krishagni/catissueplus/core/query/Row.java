@@ -7,6 +7,8 @@ public class Row {
 
 	private Map<String, Object> hidden;
 
+	private Object[] fixedData;
+
 	public Object[] getData() {
 		return data;
 	}
@@ -21,5 +23,13 @@ public class Row {
 
 	public void setHidden(Map<String, Object> hidden) {
 		this.hidden = hidden;
+	}
+
+	public Object[] getFixedData() {
+		return fixedData;
+	}
+
+	public void setFixedData(Object[] fixedData) {
+		this.fixedData = fixedData;
 	}
 }

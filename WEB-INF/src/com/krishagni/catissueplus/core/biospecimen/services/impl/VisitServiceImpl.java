@@ -24,6 +24,7 @@ import com.krishagni.catissueplus.core.biospecimen.ConfigParams;
 import com.krishagni.catissueplus.core.biospecimen.domain.CollectionProtocol;
 import com.krishagni.catissueplus.core.biospecimen.domain.Specimen;
 import com.krishagni.catissueplus.core.biospecimen.domain.Visit;
+import com.krishagni.catissueplus.core.biospecimen.domain.VisitPreSaveEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.VisitSavedEvent;
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.CpErrorCode;
 import com.krishagni.catissueplus.core.biospecimen.domain.factory.CpeErrorCode;
@@ -273,7 +274,7 @@ public class VisitServiceImpl implements VisitService, ObjectAccessor, Initializ
 			// 
 			// Step 3: Collect specimens
 			//
-			RequestEvent<List<SpecimenDetail>> collectSpecimensReq = new RequestEvent<List<SpecimenDetail>>(specimens);
+			RequestEvent<List<SpecimenDetail>> collectSpecimensReq = new RequestEvent<>(specimens);
 			ResponseEvent<List<SpecimenDetail>> collectSpecimensResp = specimenSvc.collectSpecimens(collectSpecimensReq);
 			collectSpecimensResp.throwErrorIfUnsuccessful();
 			
@@ -575,6 +576,7 @@ public class VisitServiceImpl implements VisitService, ObjectAccessor, Initializ
 
 	private Visit saveOrUpdateVisit(Visit visit, Visit existing) {
 		raiseErrorIfSpecimenCentric(visit);
+		EventPublisher.getInstance().publish(new VisitPreSaveEvent(existing, visit));
 
 		String prevVisitStatus = existing != null ? existing.getStatus() : null;
 		OpenSpecimenException ose = new OpenSpecimenException(ErrorType.USER_ERROR);
@@ -952,7 +954,7 @@ public class VisitServiceImpl implements VisitService, ObjectAccessor, Initializ
 				List<SiteCpPair> siteCps = AccessCtrlMgr.getInstance().getReadAccessSpecimenSiteCps(cpId, false);
 				if (siteCps != null && siteCps.isEmpty()) {
 					endOfVisits = true;
-				} else if (!AccessCtrlMgr.getInstance().hasVisitSpecimenEximRights(cpId)) {
+				} else if (!AccessCtrlMgr.getInstance().hasVisitEximRights(cpId)) {
 					endOfVisits = true;
 				} else {
 					crit = new VisitsListCriteria()

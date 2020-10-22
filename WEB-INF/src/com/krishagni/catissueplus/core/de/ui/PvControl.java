@@ -11,6 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import edu.common.dynamicextensions.domain.nui.AbstractLookupControl;
 import edu.common.dynamicextensions.ndao.JdbcDaoFactory;
+import edu.common.dynamicextensions.nutility.XmlUtil;
 
 public class PvControl extends AbstractLookupControl implements Serializable {
 	private static final long serialVersionUID = 1L;
@@ -20,6 +21,8 @@ public class PvControl extends AbstractLookupControl implements Serializable {
 	private boolean leafNode;
 
 	private boolean rootNode;
+
+	private String defaultValue;
 
 	public String getAttribute() {
 		return attribute;
@@ -43,6 +46,14 @@ public class PvControl extends AbstractLookupControl implements Serializable {
 
 	public void setRootNode(boolean rootNode) {
 		this.rootNode = rootNode;
+	}
+
+	public String getDefaultValue() {
+		return defaultValue;
+	}
+
+	public void setDefaultValue(String defaultValue) {
+		this.defaultValue = defaultValue;
 	}
 
 	@Override
@@ -70,11 +81,18 @@ public class PvControl extends AbstractLookupControl implements Serializable {
 		props.put("attribute", attribute);
 		props.put("leafValue", leafNode);
 		props.put("rootValue", rootNode);
+		props.put("defaultValue", defaultValue);
 	}
 
 	@Override
 	public void serializeToXml(Writer writer, Properties props) {
-		super.serializeToXml("pvField", writer, props);
+		XmlUtil.writeElementStart(writer, "pvField");
+		super.serializeToXml(writer, props);
+		XmlUtil.writeElement(writer, "attribute", attribute);
+		XmlUtil.writeElement(writer, "leafValue", leafNode);
+		XmlUtil.writeElement(writer, "rootValue", rootNode);
+		XmlUtil.writeCDataElement(writer, "defaultValue", defaultValue);
+		XmlUtil.writeElementEnd(writer, "pvField");
 	}
 
 	@Override

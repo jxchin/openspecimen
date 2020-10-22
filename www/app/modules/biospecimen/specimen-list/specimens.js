@@ -4,7 +4,7 @@ angular.module('os.biospecimen.specimenlist')
     Specimen, SpecimensHolder, DeleteUtil, Alerts, Util, SettingUtil) {
 
     function init() { 
-      $scope.specimenUpdateOpts = {resource: 'VisitAndSpecimen', operations: ['Update']};
+      $scope.specimenUpdateOpts = {resources: ['Specimen', 'PrimarySpecimen'], operations: ['Update']};
       $scope.orderCreateOpts    = {resource: 'Order', operations: ['Create']};
 
       $scope.ctx = {
@@ -14,7 +14,11 @@ angular.module('os.biospecimen.specimenlist')
           objectId: list.id
         },
         breadcrumbs: $stateParams.breadcrumbs,
-        reqBasedDistOrShip: false
+        reqBasedDistOrShip: false,
+        emptyState: {
+          loadingMessage: 'specimens.loading_list',
+          emptyMessage: 'specimens.empty_list'
+        }
       }
 
       if ($injector.has('spmnReqCfgUtil')) {
@@ -67,7 +71,11 @@ angular.module('os.biospecimen.specimenlist')
 
     $scope.getSelectedSpecimens = function() {
       var selectedSpmns = $scope.ctx.listCtrl.getSelectedItems();
-      return (selectedSpmns || []).map(function(spmn) { return new Specimen({id: spmn.hidden.specimenId}); });
+      return (selectedSpmns || []).map(
+        function(spmn) {
+          return new Specimen({id: spmn.hidden.specimenId, cpId: spmn.hidden.cpId});
+        }
+      );
     }
 
     $scope.addChildSpecimens = function() {
@@ -98,10 +106,6 @@ angular.module('os.biospecimen.specimenlist')
         templateUrl: 'modules/biospecimen/specimen-list/confirm-remove-specimens.html',
         delete: removeSpecimensFromList
       });
-    }
-
-    $scope.distributeCart = function() {
-      $state.go('order-addedit', {specimenListId: list.id});
     }
 
     $scope.setListCtrl = function(listCtrl) {

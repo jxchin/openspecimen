@@ -6,6 +6,8 @@ import java.util.List;
 public class ListDetail {
 	private List<Column> columns = new ArrayList<>();
 
+	private List<Column> fixedColumns;
+
 	private List<Row> rows = new ArrayList<>();
 
 	private int size = -1;
@@ -16,6 +18,14 @@ public class ListDetail {
 
 	public void setColumns(List<Column> columns) {
 		this.columns = columns;
+	}
+
+	public List<Column> getFixedColumns() {
+		return fixedColumns;
+	}
+
+	public void setFixedColumns(List<Column> fixedColumns) {
+		this.fixedColumns = fixedColumns;
 	}
 
 	public List<Row> getRows() {

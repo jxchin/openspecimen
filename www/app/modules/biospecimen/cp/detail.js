@@ -2,7 +2,8 @@
 angular.module('os.biospecimen.cp.detail', ['os.biospecimen.models'])
   .controller('CpDetailCtrl', function(
     $scope, $q, $translate, cp,
-    CollectionProtocol, PvManager, DeleteUtil, CpSettingsReg, SettingUtil) {
+    CollectionProtocol, PvManager, DeleteUtil, CpSettingsReg,
+    SettingUtil, Util, Alerts, osExportSvc) {
 
     function init() {
       //
@@ -36,6 +37,17 @@ angular.module('os.biospecimen.cp.detail', ['os.biospecimen.models'])
       );
     }
 
+    function updateStatus(newStatus, successMsg) {
+      var toUpdate = angular.copy($scope.cp);
+      toUpdate.activityStatus = newStatus;
+      toUpdate.$saveOrUpdate().then(
+        function(savedCp) {
+          $scope.cp.activityStatus = savedCp.activityStatus;
+          Alerts.success(successMsg);
+        }
+      );
+    }
+
     $scope.editCp = function(property, value) {
       var d = $q.defer();
       d.resolve({});
@@ -44,6 +56,28 @@ angular.module('os.biospecimen.cp.detail', ['os.biospecimen.models'])
 
     $scope.deleteCp = function() {
       DeleteUtil.delete($scope.cp, {onDeleteState: 'cp-list', forceDelete: true, askReason: true});
+    }
+
+    $scope.closeCp = function() {
+      Util.showConfirm({
+        title: 'cp.close_cp_q',
+        confirmMsg: 'cp.confirm_close_cp_msg',
+        ok: function() {
+          updateStatus('Closed', 'cp.closed');
+        }
+      });
+    }
+
+    $scope.reopenCp = function() {
+      updateStatus('Active', 'cp.reopened');
+    }
+
+    $scope.exportEvents = function() {
+      osExportSvc.exportRecords({objectType: 'cpe', params: {cpId: cp.id}});
+    }
+
+    $scope.exportReqs = function() {
+      osExportSvc.exportRecords({objectType: 'sr', params: {cpId: cp.id}});
     }
 
     init();

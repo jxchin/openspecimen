@@ -1,6 +1,9 @@
 
 angular.module('os.biospecimen.extensions.list', ['os.biospecimen.models', 'os.biospecimen.extensions.util'])
-  .controller('FormsListCtrl', function($scope, $state, $stateParams, forms, ExtensionsUtil) {
+  .controller('FormsListCtrl', function(
+    $scope, $state, $stateParams, $injector,
+    forms, Form, ExtensionsUtil) {
+
     function init() {
       $scope.forms   = forms;
       $scope.fctx = {
@@ -114,6 +117,10 @@ angular.module('os.biospecimen.extensions.list', ['os.biospecimen.models', 'os.b
           }
         }
       ); 
+    }
+
+    $scope.switchToSurveyMode = function(survey) {
+      $injector.get('SurveyInstance').switchToSurveyMode($scope.object, survey);
     }
 
     init();

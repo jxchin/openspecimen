@@ -12,7 +12,7 @@
 
       <h3>
         <os-spmn-list-name list="ctx.list"></os-spmn-list-name>
-        <button class="btn btn-default btn-xs"
+        <button class="btn btn-default os-btn-info"
           title="{{'specimen_list.cart_info' | translate}}"
           data-placement="bottom" data-container="body" data-trigger="hover"
           content-template="modules/biospecimen/specimen-list/detail-po.html" bs-popover>
@@ -28,12 +28,8 @@
 
   <div class="os-page-commands">
     <div class="left">
-      <os-specimen-ops specimens="getSelectedSpecimens()" init-list="loadSpecimens()"></os-specimen-ops>
-
-      <button show-if-allowed="orderCreateOpts" ng-if="!ctx.reqBasedDistOrShip" class="default" ng-click="distributeCart()">
-        <span class="fa fa-share"></span>
-        <span translate="specimen_list.distribute_all">Distribute All</span>
-      </button>
+      <os-specimen-ops specimens="getSelectedSpecimens()" init-list="loadSpecimens()" cart="ctx.list">
+      </os-specimen-ops>
 
       <os-plugin-hooks view-name="'specimen-list'" sec-name="'page-header'"></os-plugin-hooks>
 
@@ -82,7 +78,8 @@
   <div class="os-container-wrapper">
     <div>
       <os-list params="ctx.params" item-sref="specimen({specimenId: row.hidden.specimenId})"
-        enable-selection="true" show-item="showSpecimen(row)" init-ctrl="setListCtrl($list)">
+        enable-selection="true" show-item="showSpecimen(row)" init-ctrl="setListCtrl($list)"
+        empty-state="ctx.emptyState">
       </os-list>
     </div>
   </div>

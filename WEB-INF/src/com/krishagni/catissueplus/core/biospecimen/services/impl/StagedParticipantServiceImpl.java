@@ -31,6 +31,7 @@ import com.krishagni.catissueplus.core.common.errors.ErrorCode;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
 import com.krishagni.catissueplus.core.common.events.RequestEvent;
 import com.krishagni.catissueplus.core.common.events.ResponseEvent;
+import com.krishagni.catissueplus.core.common.util.Utility;
 
 public class StagedParticipantServiceImpl implements StagedParticipantService {
 	private static final Log logger = LogFactory.getLog(StagedParticipantServiceImpl.class);
@@ -64,27 +65,66 @@ public class StagedParticipantServiceImpl implements StagedParticipantService {
 
 	private void updateParticipantIfExists(StagedParticipantDetail input) {
 		Participant existing = daoFactory.getParticipantDao().getByEmpi(input.getEmpi());
-
 		if (existing == null) {
 			return;
 		}
 
 		ParticipantDetail detail = ParticipantDetail.from(existing, false);
-		detail.setEmpi(input.getEmpi());
-		detail.setUid(input.getUid());
-		detail.setEthnicities(input.getEthnicities());
-		detail.setGender(input.getGender());
-		detail.setLastName(input.getLastName());
-		detail.setFirstName(input.getFirstName());
-		detail.setMiddleName(input.getMiddleName());
-		detail.setBirthDate(input.getBirthDate());
-		detail.setRaces(input.getRaces());
-		detail.setPmis(input.getPmis());
-		detail.setSource(input.getSource());
+		if (input.isAttrModified("newEmpi")) {
+			detail.setEmpi(input.getNewEmpi());
+		}
 
-		ResponseEvent<ParticipantDetail> resp = participantSvc.updateParticipant(new RequestEvent<>(detail));
+		if (input.isAttrModified("uid")) {
+			detail.setUid(input.getUid());
+		}
+
+		if (input.isAttrModified("ethnicities")) {
+			detail.setEthnicities(input.getEthnicities());
+		}
+
+		if (input.isAttrModified("gender")) {
+			detail.setGender(input.getGender());
+		}
+
+		if (input.isAttrModified("lastName")) {
+			detail.setLastName(input.getLastName());
+		}
+
+		if (input.isAttrModified("firstName")) {
+			detail.setFirstName(input.getFirstName());
+		}
+
+		if (input.isAttrModified("middleName")) {
+			detail.setMiddleName(input.getMiddleName());
+		}
+
+		if (input.isAttrModified("birthDate")) {
+			detail.setBirthDate(input.getBirthDate());
+		}
+
+		if (input.isAttrModified("deathDate")) {
+			detail.setDeathDate(input.getDeathDate());
+		}
+
+		if (input.isAttrModified("vitalStatus")) {
+			detail.setVitalStatus(input.getVitalStatus());
+		}
+
+		if (input.isAttrModified("races")) {
+			detail.setRaces(input.getRaces());
+		}
+
+		if (input.isAttrModified("pmis")) {
+			detail.setPmis(input.getPmis());
+		}
+
+		if (input.isAttrModified("source")) {
+			detail.setSource(input.getSource());
+		}
+
+		ResponseEvent<ParticipantDetail> resp = participantSvc.patchParticipant(new RequestEvent<>(detail));
 		if (resp.isSuccessful()) {
-			logger.info("Matching participant (empi: '" + detail.getEmpi() + "') found and updated!");
+			logger.info("Matching participant (eMPI: '" + detail.getEmpi() + "') found and updated!");
 		}
 	}
 
@@ -119,8 +159,11 @@ public class StagedParticipantServiceImpl implements StagedParticipantService {
 
 	private void setParticipantAtrrs(StagedParticipantDetail detail, StagedParticipant participant) {
 		participant.setFirstName(detail.getFirstName());
+		participant.setMiddleName(detail.getMiddleName());
 		participant.setLastName(detail.getLastName());
+		participant.setEmailAddress(detail.getEmailAddress());
 		participant.setBirthDate(detail.getBirthDate());
+		participant.setDeathDate(detail.getDeathDate());
 		participant.setGender(getPv(PvAttributes.GENDER, detail.getGender(), ParticipantErrorCode.INVALID_GENDER));
 		participant.setVitalStatus(getPv(PvAttributes.VITAL_STATUS, detail.getVitalStatus(), ParticipantErrorCode.INVALID_VITAL_STATUS));
 		participant.setUpdatedTime(Calendar.getInstance().getTime());
@@ -145,7 +188,7 @@ public class StagedParticipantServiceImpl implements StagedParticipantService {
 
 		Set<String> ethnicities = detail.getEthnicities();
 		if (CollectionUtils.isNotEmpty(ethnicities)) {
-			participant.setRaces(getPvs(PvAttributes.ETHNICITY, ethnicities, ParticipantErrorCode.INVALID_ETHNICITY));
+			participant.setEthnicities(getPvs(PvAttributes.ETHNICITY, ethnicities, ParticipantErrorCode.INVALID_ETHNICITY));
 		}
 	}
 

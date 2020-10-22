@@ -26,20 +26,18 @@ public class ParticipantDaoImpl extends AbstractDao<Participant> implements Part
 	@Override
 	@SuppressWarnings("unchecked")
 	public Participant getByUid(String uid) {		
-		List<Participant> participants = sessionFactory.getCurrentSession()
-				.getNamedQuery(GET_BY_UID)
-				.setString("uid", uid.toLowerCase())
-				.list();
+		List<Participant> participants = getCurrentSession().getNamedQuery(GET_BY_UID)
+			.setParameter("uid", uid.toLowerCase())
+			.list();
 		return participants == null || participants.isEmpty() ? null : participants.iterator().next();
 	}
 	
 	@Override
 	@SuppressWarnings("unchecked")
 	public Participant getByEmpi(String empi) {
-		List<Participant> participants = sessionFactory.getCurrentSession()
-				.getNamedQuery(GET_BY_EMPI)
-				.setString("empi", empi.toLowerCase())
-				.list();
+		List<Participant> participants = getCurrentSession().getNamedQuery(GET_BY_EMPI)
+			.setParameter("empi", empi.toLowerCase())
+			.list();
 		return participants == null || participants.isEmpty() ? null : participants.iterator().next();
 	}
 
@@ -106,19 +104,20 @@ public class ParticipantDaoImpl extends AbstractDao<Participant> implements Part
 		Criteria query = sessionFactory.getCurrentSession().createCriteria(Participant.class)
 				.createAlias("pmis", "pmi")
 				.createAlias("pmi.site", "site");
-		
-		Disjunction junction = Restrictions.disjunction();
-		
+
 		boolean added = false;
+		Disjunction junction = Restrictions.disjunction();
 		for (PmiDetail pmi : pmis) {
 			if (StringUtils.isBlank(pmi.getSiteName()) || StringUtils.isBlank(pmi.getMrn())) {
 				continue;
 			}
 			
 			junction.add(
-					Restrictions.and(
-							Restrictions.ilike("pmi.medicalRecordNumber", pmi.getMrn()),
-							Restrictions.ilike("site.name", pmi.getSiteName())));
+				Restrictions.and(
+					Restrictions.eq("site.name", pmi.getSiteName()).ignoreCase(),
+					Restrictions.eq("pmi.medicalRecordNumber", pmi.getMrn()).ignoreCase()
+				)
+			);
 			
 			added = true;
 		}
@@ -127,8 +126,7 @@ public class ParticipantDaoImpl extends AbstractDao<Participant> implements Part
 			return null;
 		}
 		
-		return query.add(junction);						
-		
+		return query.add(junction);
 	}
 
 	private static final String FQN = Participant.class.getName();
@@ -140,6 +138,6 @@ public class ParticipantDaoImpl extends AbstractDao<Participant> implements Part
 	private static final String GET_BY_UID = FQN + ".getByUid";
 	
 	private static final String GET_BY_EMPI = FQN + ".getByEmpi";
-	
+
 	private static final String GET_BY_LNAME_AND_DOB = FQN + ".getByLnameAndDob";
 }

@@ -1,67 +1,71 @@
 
 angular.module('os.biospecimen.cp.list', ['os.biospecimen.models'])
   .controller('CpListCtrl', function(
-    $scope, $state, cpList, CollectionProtocol, Util, DeleteUtil,
-    PvManager, CheckList, ListPagerOpts, AuthorizationService) {
+    $scope, $state, cpsCtx, CollectionProtocol, DeleteUtil, AuthorizationService) {
 
-    var pagerOpts, filterOpts;
+    var ctx;
 
     function init() {
-      pagerOpts  = $scope.pagerOpts    = new ListPagerOpts({listSizeGetter: getCpCount});
-      filterOpts = $scope.cpFilterOpts = Util.filterOpts({maxResults: pagerOpts.recordsPerPage + 1});
-
       $scope.allowReadJobs = AuthorizationService.isAllowed($scope.participantResource.createOpts) ||
         AuthorizationService.isAllowed($scope.participantResource.updateOpts) ||
         AuthorizationService.isAllowed($scope.specimenResource.updateOpts);
 
-      $scope.ctx = {};
-      setList(cpList);
-      Util.filter($scope, 'cpFilterOpts', loadCollectionProtocols);
-    }
+      ctx = $scope.ctx = {
+        params: {
+          listName: 'cp-list-view',
+          objectId: -1
+        },
 
-    function setList(list) {
-      pagerOpts.refreshOpts(list);
-
-      $scope.cpList = list;
-      $scope.ctx.checkList = new CheckList(list);
-    }
-
-    function getCpCount() {
-      return CollectionProtocol.getCount(filterOpts);
-    }
-
-    function loadCollectionProtocols() {
-      CollectionProtocol.list(filterOpts).then(
-        function(cpList) {
-          setList(cpList);
+        emptyState: {
+          loadingMessage: 'cp.loading_list',
+          emptyMessage: 'cp.empty_list'
         }
-      );
-    };
+      };
+    }
 
     function getCpIds(cps) {
-      return cps.map(function(cp) { return cp.id; });
+      return cps.map(function(cp) { return +cp.hidden.cpId; });
     }
 
-    $scope.showCpSummary = function(cp) {
-      $state.go('cp-summary-view', {cpId: cp.id});
+    $scope.showCpSummary = function(row) {
+      $state.go('cp-summary-view', {cpId: row.hidden.cpId});
     };
 
     $scope.deleteCps = function() {
-      var cps = $scope.ctx.checkList.getSelectedItems();
+      var cps = ctx.listCtrl.checkList.getSelectedItems();
 
       var opts = {
         confirmDelete:  'cp.delete_cps',
         successMessage: 'cp.cps_deleted',
         pendingMessage: 'cp.cps_delete_pending',
-        onBulkDeletion: loadCollectionProtocols,
+        onBulkDeletion: function() { ctx.listCtrl.loadList(); },
         askReason:      true
       }
 
       DeleteUtil.bulkDelete({bulkDelete: CollectionProtocol.bulkDelete}, getCpIds(cps), opts);
     }
 
-    $scope.pageSizeChanged = function() {
-      filterOpts.maxResults = pagerOpts.recordsPerPage + 1;
+    $scope.setListCtrl = function(listCtrl) {
+      ctx.listCtrl = listCtrl;
+      ctx.showSearch = listCtrl.haveFilters;
+      listCtrl.viewCtx = cpsCtx;
+    }
+
+    $scope.toggleStarredCp = function(cp) {
+      var q;
+      if (cp.$$starred) {
+        q = new CollectionProtocol({id: +cp.hidden.cpId}).unstar();
+      } else {
+        q = new CollectionProtocol({id: +cp.hidden.cpId}).star();
+      }
+
+      q.then(
+        function(result) {
+          if (result.status == true) {
+            cp.$$starred = !cp.$$starred;
+          }
+        }
+      );
     }
 
     init();

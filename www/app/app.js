@@ -20,7 +20,8 @@ var osApp = angular.module('openspecimen', [
   'mgcrea.ngStrap.popover',
   'angular-loading-bar',
   'pascalprecht.translate',
-  'chart.js'
+  'chart.js',
+  'ui.tinymce'
   ]);
 
 osApp.config(function(
@@ -87,6 +88,14 @@ osApp.config(function(
           },
           authInit: function(currentUser, AuthorizationService) {
             return AuthorizationService.initializeUserRights(currentUser);
+          },
+          videoSettings : function (Setting) {
+            return Setting.getWelcomeVideoSetting();
+          },
+          authToken: function(userUiState, AuthService) {
+            if (userUiState.authToken) {
+              AuthService.saveToken(userUiState.authToken);
+            }
           }
         },
         controller: 'SignedInCtrl'
@@ -94,7 +103,17 @@ osApp.config(function(
       .state('home', {
         url: '/home',
         templateUrl: 'modules/common/home.html',
-        controller: function() {
+        controller: function($window, $rootScope, $state) {
+          var localStore = $window.localStorage;
+          if (!localStore['osReqState']) {
+            return;
+          }
+
+          var reqState = JSON.parse(localStore['osReqState']);
+          if (reqState.name != $rootScope.state.name) {
+            delete localStore['osReqState'];
+            $state.go(reqState.name, reqState.params);
+          }
         },
         parent: 'signed-in'
       })
@@ -344,6 +363,7 @@ osApp.config(function(
     });
 
     $http.defaults.headers.common['X-OS-API-CLIENT'] = "webui";
+    $http.defaults.headers.common['X-OS-CLIENT-TZ'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
     $http.defaults.withCredentials = true;
 
     if ($window.localStorage['osAuthToken']) {

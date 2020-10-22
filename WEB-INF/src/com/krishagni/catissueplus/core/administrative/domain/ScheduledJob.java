@@ -38,7 +38,7 @@ public class ScheduledJob extends BaseEntity {
 		WEDNESDAY(4),
 		THURSDAY(5),
 		FRIDAY(6),
-		SATRUDAY(7);
+		SATURDAY(7);
 		
 		private final int value;
 		
@@ -92,8 +92,12 @@ public class ScheduledJob extends BaseEntity {
 	private SavedQuery savedQuery;
 
 	private User runAs;
+
+	private String runByNode;
 	
 	private Set<User> recipients = new HashSet<>();
+
+	private Set<User> sharedWith = new HashSet<>();
 	
 	//
 	// UI purpose
@@ -248,6 +252,14 @@ public class ScheduledJob extends BaseEntity {
 		this.runAs = runAs;
 	}
 
+	public String getRunByNode() {
+		return runByNode;
+	}
+
+	public void setRunByNode(String runByNode) {
+		this.runByNode = runByNode;
+	}
+
 	public Set<User> getRecipients() {
 		return recipients;
 	}
@@ -255,7 +267,15 @@ public class ScheduledJob extends BaseEntity {
 	public void setRecipients(Set<User> recipients) {
 		this.recipients = recipients;
 	}
-	
+
+	public Set<User> getSharedWith() {
+		return sharedWith;
+	}
+
+	public void setSharedWith(Set<User> sharedWith) {
+		this.sharedWith = sharedWith;
+	}
+
 	public Boolean getRtArgsProvided() {
 		return rtArgsProvided;
 	}
@@ -282,7 +302,8 @@ public class ScheduledJob extends BaseEntity {
 
 	public void update(ScheduledJob other) {
 		BeanUtils.copyProperties(other, this, JOB_UPDATE_IGN_PROPS);
-		CollectionUpdater.update(this.getRecipients(), other.getRecipients());
+		CollectionUpdater.update(getRecipients(), other.getRecipients());
+		CollectionUpdater.update(getSharedWith(), other.getSharedWith());
 	}
 
 	public boolean isOnDemand() {
@@ -449,6 +470,7 @@ public class ScheduledJob extends BaseEntity {
 	private static final String[] JOB_UPDATE_IGN_PROPS = new String[] {
 		"id", 
 		"createdBy",
-		"recipients"
+		"recipients",
+		"sharedWith"
 	};
 }

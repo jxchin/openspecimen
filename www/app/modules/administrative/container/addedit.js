@@ -200,7 +200,7 @@ angular.module('os.administrative.container.addedit', ['os.administrative.models
         return d.promise;
       }
 
-      return PvManager.loadPvsByParent('specimen-class', undefined, true).then(
+      return PvManager.loadPvsByParent('specimen-class', undefined, true, undefined, 5000).then(
         function(specimenTypes) {
           allSpecimenTypes = specimenTypes;
           Util.assign($scope.specimenTypes, specimenTypes);
@@ -406,18 +406,30 @@ angular.module('os.administrative.container.addedit', ['os.administrative.models
       Container.createContainers($scope.ctx.containers).then(
         function(result) {
           Alerts.success('container.multiple_containers_created', {count: result.length});
+
+          var parentId = undefined;
+          if (result.length > 0) {
+            parentId = result[0].storageLocation && result[0].storageLocation.id;
+            if (result.every(function(s) { return s.storageLocation && s.storageLocation.id == parentId; })) {
+              $state.go('container-detail.locations', {containerId: parentId});
+              return;
+            }
+          }
+
           $state.go('container-list');
         }
       );
     }
 
     $scope.setDimensionless = function() {
-      $scope.container.$$regular = false;
-      $scope.container.$$dimensionless = true;
-      $scope.container.noOfRows = $scope.container.noOfColumns = null;
-      $scope.container.positionLabelingMode = 'LINEAR';
-      $scope.container.storeSpecimensEnabled = true;
-      $scope.container.rowLabelingScheme = $scope.container.columnLabelingScheme = 'Numbers';
+      var container = $scope.container;
+      container.$$regular = false;
+      container.$$dimensionless = true;
+      container.noOfRows = container.noOfColumns = null;
+      container.positionLabelingMode = 'LINEAR';
+      container.storeSpecimensEnabled =
+        (container.storeSpecimensEnabled == undefined || container.storeSpecimensEnabled == null);
+      container.rowLabelingScheme = $scope.container.columnLabelingScheme = 'Numbers';
     }
 
     $scope.setAutomated = function() {

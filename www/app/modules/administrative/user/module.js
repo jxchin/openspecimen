@@ -42,7 +42,26 @@ angular.module('os.administrative.user',
               return User.getById($stateParams.userId);
             }
 
-            return new User();
+            return new User({dnd: false});
+          },
+          users: function() {
+            return [];
+          }
+        },
+        controller: 'UserAddEditCtrl',
+        parent: 'user-root'
+      })
+      .state('user-edit-profile', {
+        url: '/user-edit-profile',
+        templateUrl: 'modules/administrative/user/addedit.html',
+        resolve: {
+          user: function(currentUser, User) {
+            return User.getById(currentUser.id).then(
+              function(user) {
+                user.$$editProfile = true;
+                return user;
+              }
+            );
           },
           users: function() {
             return [];
@@ -85,7 +104,7 @@ angular.module('os.administrative.user',
               breadcrumbs: [{state: 'user-list', title: 'user.list'}],
               objectType: objectType,
               title: title,
-              onSuccess: {state: 'user-list'}
+              onSuccess: {state: 'user-import-jobs'}
             };
           }
         },

@@ -9,23 +9,25 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.Period;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.TimeZone;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,6 +41,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.beanutils.BeanToPropertyValueTransformer;
@@ -59,6 +62,7 @@ import com.krishagni.catissueplus.core.common.Pair;
 import com.krishagni.catissueplus.core.common.PdfUtil;
 import com.krishagni.catissueplus.core.common.domain.IntervalUnit;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
+import com.krishagni.catissueplus.core.exporter.services.impl.ExporterContextHolder;
 
 import au.com.bytecode.opencsv.CSVWriter;
 
@@ -194,6 +198,10 @@ public class Utility {
 		return stringListToCsv(elements.toArray(new String[0]), quotechar, fieldSeparator);
 	}
 
+	public static String stringListToCsv(Collection<String> elements, boolean quotechar, char fieldSeparator, String lineEnding) {
+		return stringListToCsv(elements.toArray(new String[0]), quotechar, fieldSeparator, lineEnding);
+	}
+
 	public static String stringListToCsv(String[] elements) {
 		return stringListToCsv(elements, true);
 	}
@@ -203,13 +211,17 @@ public class Utility {
 	}
 
 	public static String stringListToCsv(String[] elements, boolean quotechar, char fieldSeparator) {
+		return stringListToCsv(elements, quotechar, fieldSeparator, null);
+	}
+
+	public static String stringListToCsv(String[] elements, boolean quotechar, char fieldSeparator, String lineEnding) {
 		StringWriter writer = new StringWriter();
 		CsvWriter csvWriter = null;
 		try {
 			if (quotechar) {
-				csvWriter = CsvFileWriter.createCsvFileWriter(writer, fieldSeparator, CSVWriter.DEFAULT_QUOTE_CHARACTER);
+				csvWriter = CsvFileWriter.createCsvFileWriter(writer, fieldSeparator, CSVWriter.DEFAULT_QUOTE_CHARACTER, lineEnding);
 			} else {
-				csvWriter = CsvFileWriter.createCsvFileWriter(writer, fieldSeparator, CSVWriter.NO_QUOTE_CHARACTER);
+				csvWriter = CsvFileWriter.createCsvFileWriter(writer, fieldSeparator, CSVWriter.NO_QUOTE_CHARACTER, lineEnding);
 			}
 			csvWriter.writeNext(elements);
 			csvWriter.flush();
@@ -243,6 +255,39 @@ public class Utility {
 			IOUtils.closeQuietly(strWriter);
 			IOUtils.closeQuietly(csvWriter);
 		}
+	}
+
+	public static String getQuotedString(String input) {
+		return getQuotedString(input, '"');
+	}
+
+	public static String getQuotedString(String input, char quoteChar) {
+		return getQuotedString(input, quoteChar, quoteChar);
+	}
+
+	public static String getQuotedString(String input, char quoteChar, char escapeChar) {
+		if (input == null || input.isEmpty()) {
+			return input;
+		}
+
+		StringBuilder result = new StringBuilder();
+		result.append(quoteChar);
+
+		if (input.indexOf(quoteChar) == -1 && input.indexOf(escapeChar) == -1) {
+			result.append(input);
+		} else {
+			for (int i = 0; i < input.length(); ++i) {
+				char nextChar = input.charAt(i);
+				if (escapeChar != 0 && (nextChar == quoteChar || nextChar == escapeChar)) {
+					result.append(escapeChar).append(nextChar);
+				} else {
+					result.append(nextChar);
+				}
+			}
+		}
+
+		result.append(quoteChar);
+		return result.toString();
 	}
 
 	public static long getTimezoneOffset() {
@@ -337,11 +382,63 @@ public class Utility {
 	}
 
 	public static String getDateString(Date date) {
-		return new SimpleDateFormat(ConfigUtil.getInstance().getDateFmt()).format(date);
+		return getDateString(date, false);
+	}
+
+	public static String getDateString(Date date, boolean dateOnly) {
+		SimpleDateFormat sdf = new SimpleDateFormat(ConfigUtil.getInstance().getDateFmt());
+		if (dateOnly) {
+			return sdf.format(date);
+		}
+
+		TimeZone timeZone = AuthUtil.getUserTimeZone();
+		if (timeZone != null) {
+			sdf.setTimeZone(timeZone);
+		}
+
+		return sdf.format(date);
+	}
+
+	public static Date parseDateString(String dateStr) {
+		try {
+			SimpleDateFormat sdf = new SimpleDateFormat(ConfigUtil.getInstance().getDateFmt());
+			TimeZone timeZone = AuthUtil.getUserTimeZone();
+			if (timeZone != null) {
+				sdf.setTimeZone(timeZone);
+			}
+
+			return sdf.parse(dateStr);
+		} catch (ParseException pe) {
+			throw OpenSpecimenException.serverError(pe);
+		}
 	}
 
 	public static String getDateTimeString(Date date) {
-		return new SimpleDateFormat(ConfigUtil.getInstance().getDateTimeFmt()).format(date);
+		SimpleDateFormat sdf = new SimpleDateFormat(ConfigUtil.getInstance().getDateTimeFmt());
+		TimeZone timeZone = AuthUtil.getUserTimeZone();
+		if (timeZone != null) {
+			sdf.setTimeZone(timeZone);
+		}
+
+		return sdf.format(date);
+	}
+
+	public static Date parseDateTimeString(String dateTimeStr) {
+		try {
+			SimpleDateFormat sdf = new SimpleDateFormat(ConfigUtil.getInstance().getDateTimeFmt());
+			TimeZone timeZone = AuthUtil.getUserTimeZone();
+			if (timeZone != null) {
+				sdf.setTimeZone(timeZone);
+			}
+
+			return sdf.parse(dateTimeStr);
+		} catch (ParseException pe) {
+			throw OpenSpecimenException.serverError(pe);
+		}
+	}
+
+	public static String format(Date date, String format) {
+		return date != null ? new SimpleDateFormat(format).format(date) : null;
 	}
 
 	public static Integer getYear(Date date) {
@@ -406,18 +503,15 @@ public class Utility {
 	}
 
 	public static Integer yearsBetween(Date start, Date end) {
-		Period period = getPeriodBetween(start, end);
-		return period != null ? period.getYears() : null;
+		return getPeriodBetween(ChronoUnit.YEARS, start, end);
 	}
 
 	public static Integer monthsBetween(Date start, Date end) {
-		Period period = getPeriodBetween(start, end);
-		return period != null ? period.getMonths() : null;
+		return getPeriodBetween(ChronoUnit.MONTHS, start, end);
 	}
 
 	public static Integer daysBetween(Date start, Date end) {
-		Period period = getPeriodBetween(start, end);
-		return period != null ? period.getDays() : null;
+		return getPeriodBetween(ChronoUnit.DAYS, start, end);
 	}
 
 	public static int cmp(Date d1, Date d2) {
@@ -663,6 +757,47 @@ public class Utility {
 		return error;
 	}
 
+	public static Object getProperty(Object object, String propName) {
+		try {
+			return PropertyUtils.getProperty(object, propName);
+		} catch (Exception e) {
+			throw OpenSpecimenException.serverError(e);
+		}
+	}
+
+	public static void setProperty(Object object, String propName, Object value) {
+		try {
+			PropertyUtils.setProperty(object, propName, value);
+		} catch (Exception e) {
+			throw OpenSpecimenException.serverError(e);
+		}
+	}
+
+	public static String getRemoteAddress(HttpServletRequest httpReq) {
+		Enumeration<String> headers = httpReq.getHeaderNames();
+
+		String result = null;
+		while (headers.hasMoreElements()) {
+			String header = headers.nextElement();
+			if (header != null && !header.toLowerCase().equals("x-forwarded-for")) {
+				continue;
+			}
+
+			String value = httpReq.getHeader(header);
+			if (StringUtils.isNotBlank(value)) {
+				String[] parts = value.split(",");
+				result = parts[0].trim();
+				break;
+			}
+		}
+
+		if (StringUtils.isBlank(result)) {
+			result = httpReq.getRemoteAddr();
+		}
+
+		return result;
+	}
+
 	private static Map<String, Object> getExtnAttrValues(BaseExtensionEntity obj) {
 		if (obj.getExtension() != null) {
 			return obj.getExtension().getAttrValues();
@@ -820,7 +955,11 @@ public class Utility {
 		return Utility.nullSafeStream(coll).map(mapper).collect(Collectors.joining(delimiter));
 	}
 
-	private static Period getPeriodBetween(Date from, Date to) {
+	public static boolean isExportOp() {
+		return ExporterContextHolder.getInstance().isExportOp();
+	}
+
+	private static Integer getPeriodBetween(ChronoUnit unit, Date from, Date to) {
 		if (from == null) {
 			return null;
 		}
@@ -831,6 +970,6 @@ public class Utility {
 			endDt = LocalDate.from(to.toInstant().atZone(ZoneId.systemDefault()));
 		}
 
-		return Period.between(startDt, endDt);
+		return Math.toIntExact(unit.between(startDt, endDt));
 	}
 }

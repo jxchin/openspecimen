@@ -169,12 +169,12 @@
     </sql>
   </changeSet>
 
-  <changeSet author="vpawar" id="PV: Update specimen requirement - Not Specified type">
+  <changeSet author="vpawar" id="PV: Update specimen requirement - Not Specified type" runOnChange="true">
     <sql>
       update
         catissue_cp_req_specimen
       set
-        specimen_type = concat(specimen_type, concat(' - ', specimen_class))
+        specimen_type = concat(specimen_class, concat(' - ', specimen_type))
       where
         specimen_type = 'Not Specified'
     </sql>
@@ -182,7 +182,7 @@
       update
         catissue_cp_req_specimen_aud
       set
-        specimen_type = concat(specimen_type, concat(' - ', specimen_class))
+        specimen_type = concat(specimen_class, concat(' - ', specimen_type))
       where
         specimen_type = 'Not Specified'
     </sql>
@@ -223,12 +223,12 @@
     <sql>call set_pv_ids('catissue_specimen_aud', 'specimen_class', 'specimen_class_id', 'specimen_type');</sql>
   </changeSet>
 
-  <changeSet author="vpawar" id="PV: Update specimen - Not Specified type">
+  <changeSet author="vpawar" id="PV: Update specimen - Not Specified type" runOnChange="true">
     <sql>
       update
         catissue_specimen
       set
-        specimen_type = concat(specimen_type, concat(' - ', specimen_class))
+        specimen_type = concat(specimen_class, concat(' - ', specimen_type))
       where
         specimen_type = 'Not Specified'
     </sql>
@@ -236,7 +236,7 @@
       update
         catissue_specimen_aud
       set
-        specimen_type = concat(specimen_type, concat(' - ', specimen_class))
+        specimen_type = concat(specimen_class, concat(' - ', specimen_type))
       where
         specimen_type = 'Not Specified'
     </sql>
@@ -364,5 +364,123 @@
   <changeSet author="vpawar" id="DP requirement: pathology status">
     <sql>call set_pv_ids('os_dpr_pathology_statuses', 'pathology_status', 'pathology_status_id', 'pathology_status');</sql>
     <sql>call set_pv_ids('os_dpr_pathology_statuses_aud', 'pathology_status', 'pathology_status_id', 'pathology_status');</sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Anticipated specimens: visit PV attributes">
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'clinical_status', 'clinical_status_id', 'clinical_status');</sql>
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'clinical_diagnosis', 'clinical_diagnosis_id', 'clinical_diagnosis');</sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Anticipated specimens: not specified type" runOnChange="true">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="os_cpr_anticipated_spmns" columnName="specimen_type"/>
+    </preConditions>
+    <sql>
+      update
+        os_cpr_anticipated_spmns
+      set
+        specimen_type = concat(specimen_class, concat(' - ', specimen_type))
+      where
+        specimen_type = 'Not Specified'
+    </sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Anticipated specimens: specimen PV attributes">
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'specimen_class', 'specimen_class_id', 'specimen_type');</sql>
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'specimen_type', 'specimen_type_id', 'specimen_type');</sql>
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'anatomic_site', 'anatomic_site_id', 'anatomic_site');</sql>
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'laterality', 'laterality_id', 'laterality');</sql>
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'path_status', 'path_status_id', 'pathology_status');</sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Anticipated specimens: specimen PV attributes - 2">
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'collection_container', 'collection_container_id', 'collection_container');</sql>
+    <sql>call set_pv_ids('os_cpr_anticipated_spmns', 'collection_procedure', 'collection_procedure_id', 'collection_procedure');</sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Migrate printed specimen label item IDs" dbms="mysql">
+    <sql>
+      update
+        os_label_print_job_items ji
+        inner join os_label_print_jobs j on j.identifier = ji.job_id
+        inner join catissue_specimen s on s.label = ji.item_label
+      set
+        ji.item_id = s.identifier
+      where
+        j.item_type = 'specimen'
+    </sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Migrate printed specimen label item IDs" dbms="oracle">
+    <sql>
+      merge into
+        os_label_print_job_items ji
+      using(
+        select
+          s.label, sj.identifier as job_id, min(s.identifier) as identifier
+        from
+          catissue_specimen s
+          inner join os_label_print_job_items si on si.item_label = s.label
+          inner join os_label_print_jobs sj on sj.identifier = si.job_id
+        where
+          sj.item_type = 'specimen'
+        group by
+          s.label, sj.identifier
+      ) spmn on (spmn.label = ji.item_label and spmn.job_id = ji.job_id)
+      when matched then
+        update set ji.item_id = spmn.identifier
+    </sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Migrate printed visit name item IDs" dbms="mysql">
+    <sql>
+      update
+        os_label_print_job_items ji
+        inner join os_label_print_jobs j on j.identifier = ji.job_id
+        inner join catissue_specimen_coll_group v on v.name = ji.item_label
+      set
+        ji.item_id = v.identifier
+      where
+        j.item_type = 'visit'
+    </sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Migrate printed visit name item IDs" dbms="oracle">
+    <sql>
+      merge into
+        os_label_print_job_items ji
+      using(
+        select
+          v.name, vj.identifier as job_id, min(v.identifier) as identifier
+        from
+          catissue_specimen_coll_group v
+          inner join os_label_print_job_items vi on vi.item_label = v.name
+          inner join os_label_print_jobs vj on vj.identifier = vi.job_id
+        where
+          vj.item_type = 'visit'
+        group by
+          v.name, vj.identifier
+      ) visit on (visit.name = ji.item_label and visit.job_id = ji.job_id)
+      when matched then
+        update set ji.item_id = visit.identifier
+    </sql>
+  </changeSet>
+
+  <changeSet author="vpawar" id="Migrate printed container and distribution label item IDs">
+    <sql>
+      update
+        os_label_print_job_items
+      set
+        item_id = cast(item_label as decimal)
+      where
+        job_id in (
+          select
+            identifier
+          from
+            os_label_print_jobs
+          where
+            item_type in ('storage_container', 'distribution_order_item')
+        )
+    </sql>
   </changeSet>
 </databaseChangeLog>

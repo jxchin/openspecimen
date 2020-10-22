@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ import com.krishagni.catissueplus.core.biospecimen.repository.DaoFactory;
 import com.krishagni.catissueplus.core.biospecimen.services.SpecimenService;
 import com.krishagni.catissueplus.core.biospecimen.services.VisitService;
 import com.krishagni.catissueplus.core.common.CollectionUpdater;
+import com.krishagni.catissueplus.core.common.access.AccessCtrlMgr;
 import com.krishagni.catissueplus.core.common.domain.PrintItem;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
 import com.krishagni.catissueplus.core.common.events.DependentEntityDetail;
@@ -39,6 +41,7 @@ import com.krishagni.catissueplus.core.common.service.impl.EventPublisher;
 import com.krishagni.catissueplus.core.common.util.Status;
 import com.krishagni.catissueplus.core.common.util.Utility;
 import com.krishagni.catissueplus.core.de.services.impl.FormUtil;
+import com.krishagni.rbac.common.errors.RbacErrorCode;
 
 @Configurable
 @Audited
@@ -374,8 +377,20 @@ public class Visit extends BaseExtensionEntity {
 		if (checkDependency) {
 			ensureNoActiveChildObjects();
 		}
-		
+
+		Boolean hasDeleteSpmnRights = getRegistration().getHasDeleteSpecimenRights();
 		for (Specimen specimen : getSpecimens()) {
+			if (specimen.isActiveOrClosed() && specimen.isCollected()) {
+				if (hasDeleteSpmnRights == null) {
+					hasDeleteSpmnRights = AccessCtrlMgr.getInstance().hasDeleteSpecimenRights(getRegistration());
+					getRegistration().setHasDeleteSpecimenRights(hasDeleteSpmnRights);
+				}
+
+				if (!hasDeleteSpmnRights) {
+					throw OpenSpecimenException.userError(RbacErrorCode.ACCESS_DENIED);
+				}
+			}
+
 			specimen.disable(checkDependency);
 		}
 		
@@ -396,8 +411,8 @@ public class Visit extends BaseExtensionEntity {
 		
 		setName(visit.getName());
 		setClinicalStatus(visit.getClinicalStatus());
-		setCpEvent(visit.getCpEvent());
-		setRegistration(visit.getRegistration());
+		updateEvent(visit.getCpEvent());
+		updateRegistration(visit.getRegistration());
 		setSite(visit.getSite());
 		updateStatus(visit.getStatus());		
 		setComments(visit.getComments());
@@ -410,6 +425,7 @@ public class Visit extends BaseExtensionEntity {
 		setExtension(visit.getExtension());
 		CollectionUpdater.update(getClinicalDiagnoses(), visit.getClinicalDiagnoses());
 		setUpdated(true);
+
 	}
 
 	public void updateSprName(String sprName) {
@@ -604,7 +620,13 @@ public class Visit extends BaseExtensionEntity {
 	}
 
 	private void createSpecimens(String status) {
-		Set<SpecimenRequirement> anticipated = getCpEvent().getTopLevelAnticipatedSpecimens();
+		Set<SpecimenRequirement> anticipated;
+		if (getCpEvent() == null) {
+			anticipated = new HashSet<>();
+		} else {
+			anticipated = getCpEvent().getTopLevelAnticipatedSpecimens();
+		}
+
 		for (Specimen specimen : getTopLevelSpecimens()) {
 			if (specimen.getSpecimenRequirement() != null) {
 				anticipated.remove(specimen.getSpecimenRequirement());
@@ -699,6 +721,39 @@ public class Visit extends BaseExtensionEntity {
 
 			default:
 				return false;
+		}
+	}
+
+	private void updateEvent(CollectionProtocolEvent newEvent) {
+		CollectionProtocolEvent existingEvent = getCpEvent();
+		setCpEvent(newEvent);
+
+		if (Objects.equals(existingEvent, newEvent)) {
+			return;
+		}
+
+		// events differ. nullify the specimen requirements
+		for (Specimen spmn : getSpecimens()) {
+			spmn.setSpecimenRequirement(null);
+		}
+	}
+
+	private void updateRegistration(CollectionProtocolRegistration newCpr) {
+		CollectionProtocolRegistration existingCpr = getRegistration();
+		setRegistration(newCpr);
+
+		if (existingCpr.equals(newCpr)) {
+			return;
+		}
+
+		if (existingCpr.getCollectionProtocol().equals(newCpr.getCollectionProtocol())) {
+			return;
+		}
+
+		// CPs differ
+		for (Specimen spmn : getSpecimens()) {
+			spmn.setSpecimenRequirement(null);
+			spmn.setCollectionProtocol(newCpr.getCollectionProtocol());
 		}
 	}
 }

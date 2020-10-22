@@ -1,5 +1,58 @@
 [
     {
+        "name": "cp-list-view",
+        "data": {
+            "columns": [
+                {
+                    "expr": "CollectionProtocol.shortTitle",
+                    "caption": "Title",
+                    "metainfo": {
+                        "showLink": "true"
+                    }
+                },
+                {
+                    "expr": "CollectionProtocol.principalInvestigator.investigatorName",
+                    "caption": "Principal Investigator"
+                },
+                {
+                    "expr": "CollectionProtocol.startDate",
+                    "caption": "Start Date"
+                }
+            ],
+            "criteria": "CollectionProtocol.id exists",
+            "orderBy": [
+                {
+                    "expr": "CollectionProtocol.shortTitle",
+                    "direction": "asc"
+                }
+            ],
+            "filters": [
+                {
+                    "expr": "CollectionProtocol.shortTitle",
+                    "caption": "Title",
+                    "searchType": "contains"
+                },
+                {
+                    "expr": "CollectionProtocol.Title",
+                    "caption": "Long Title",
+                    "searchType": "contains"
+                },
+                {
+                    "expr": "CollectionProtocol.principalInvestigator.investigatorName",
+                    "caption": "Principal Investigator"
+                },
+                {
+                    "expr": "CollectionProtocol.cpSites.siteName",
+                    "caption": "Repository"
+                },
+                {
+                    "expr": "CollectionProtocol.activityStatus",
+                    "caption": "Status"
+                }
+            ]
+        }
+    },
+    {
         "name": "participant-list-view",
         "data": {
             "columns": [
@@ -535,6 +588,13 @@
                             "copyValueFn": "function(firstRowVal, currentVal) { if ((!!currentVal && !!currentVal.reservationId) && (!!firstRowVal && !!firstRowVal.reservationId)) { return currentVal;} else if (firstRowVal) { return { id: '', name: firstRowVal.name, mode: firstRowVal.mode, positionX: '', positionY: '', position: '', reservationId: '' };} else { return {}; }}"
                         },
                         {
+                            "name": "specimen.createAliquots",
+                            "caption": "Create Aliquots?",
+                            "icon": "fa fa-share-alt",
+                            "type": "toggle-checkbox",
+                            "width": "30px"
+                        },
+                        {
                             "name": "specimen.printLabel",
                             "caption": "Print",
                             "icon": "fa fa-print",
@@ -550,6 +610,195 @@
                             "defaultValue": true
                         }
                     ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "bulk-update-dictionary",
+        "data": {
+            "fields": [
+                {
+                    "name": "cpr.registrationDate",
+                    "caption": "Registration Date",
+                    "type": "date"
+                },
+                {
+                    "name" : "cpr.site",
+                    "caption" : "Registration Site",
+                    "type" : "dropdown",
+                    "listSource" : {
+                        "apiUrl" : "collection-protocols/{{cp.id}}/sites",
+                        "displayProp" : "name",
+                        "selectProp" : "name",
+                        "queryParams" : { }
+                    },
+                    "optional": true
+                },
+                {
+                    "name": "cpr.participant.gender",
+                    "caption": "Gender",
+                    "type": "pvs",
+                    "attr": "gender",
+                    "optional": true
+                },
+                {
+                    "name": "cpr.participant.vitalStatus",
+                    "caption": "Vital Status",
+                    "type": "pvs",
+                    "attr": "vital_status",
+                    "optional": true
+                },
+                {
+                    "name": "cpr.participant.ethnicities",
+                    "caption": "Ethnicity",
+                    "type": "pvs",
+                    "attr": "ethnicity",
+                    "optional": true,
+                    "multiple": true
+                },
+                {
+                    "name": "cpr.participant.races",
+                    "caption": "Race",
+                    "type": "pvs",
+                    "attr": "race",
+                    "optional": true,
+                    "multiple": true
+                },
+                {
+                    "name": "specimen.type",
+                    "caption": "Specimen Type",
+                    "type": "specimen-type",
+                    "optional": false,
+                    "specimen": "specimen"
+                },
+                {
+                    "name": "specimen.anatomicSite",
+                    "caption": "Anatomic Site",
+                    "type": "pvs",
+                    "attr": "anatomic_site",
+                    "showOnlyLeafValues": true
+                },
+                {
+                    "name": "specimen.laterality",
+                    "caption": "Laterality",
+                    "type": "pvs",
+                    "attr": "laterality"
+                },
+                {
+                    "name": "specimen.status",
+                    "caption": "Collection Status",
+                    "type": "dropdown",
+                    "listSource": {
+                        "options": [
+                            "Collected",
+                            "Missed Collection",
+                            "Not Collected",
+                            "Pending"
+                        ]
+                    }
+                },
+                {
+                    "name": "specimen.pathology",
+                    "caption": "Pathological Status",
+                    "type": "pvs",
+                    "attr": "pathology_status"
+                },
+                {
+                    "name": "specimen.initialQty",
+                    "caption": "Initial Quantity",
+                    "type" : "specimen-quantity",
+                    "specimen": "specimen"
+                },
+                {
+                    "name": "specimen.availableQty",
+                    "caption": "Available Quantity",
+                    "type" : "specimen-quantity",
+                    "specimen": "specimen",
+                    "optional": true
+                },
+                {
+                    "name": "specimen.concentration",
+                    "caption": "Concentration",
+                    "type" : "specimen-quantity",
+                    "specimen": "specimen",
+                    "measure" : "concentration",
+                    "optional": true
+                },
+                {
+                    "name": "specimen.createdOn",
+                    "caption": "Created On",
+                    "type": "date"
+                },
+                {
+                    "name": "specimen.freezeThawCycles",
+                    "caption": "Freeze/Thaw Cycles",
+                    "type": "text",
+                    "pattern" : "/^[0-9]+$/",
+                    "optional": true
+                },
+                {
+                    "name": "specimen.biohazards",
+                    "caption": "Biohazards",
+                    "type": "pvs",
+                    "attr": "specimen_biohazard",
+                    "multiple": true
+                },
+                {
+                    "name": "specimen.comments",
+                    "caption": "Comments",
+                    "type": "textarea",
+                    "optional": true
+                },
+                {
+                    "name": "specimen.collectionEvent.time",
+                    "caption": "Collection Time",
+                    "type": "datetime"
+                },
+                {
+                    "name": "specimen.collectionEvent.user",
+                    "caption": "Collector",
+                    "type": "user"
+                },
+                {
+                    "name": "specimen.collectionEvent.comments",
+                    "caption": "Collector Comments",
+                    "type": "textarea",
+                    "optional": true
+                },
+                {
+                    "name": "specimen.collectionEvent.procedure",
+                    "caption": "Collection Procedure",
+                    "type": "pvs",
+                    "attr": "collection_procedure"
+                },
+                {
+                    "name": "specimen.collectionEvent.container",
+                    "caption": "Collection Container",
+                    "type": "pvs",
+                    "attr": "collection_container"
+                },
+                {
+                    "name": "specimen.receivedEvent.time",
+                    "caption": "Received Time",
+                    "type": "datetime"
+                },
+                {
+                    "name": "specimen.receivedEvent.user",
+                    "caption": "Receiver",
+                    "type": "user"
+                },
+                {
+                    "name": "specimen.receivedEvent.comments",
+                    "caption": "Receiver Comments",
+                    "type": "textarea",
+                    "optional": true
+                },
+                {
+                    "name": "specimen.receivedEvent.receivedQuality",
+                    "caption": "Received Quality",
+                    "type": "pvs",
+                    "attr": "receive_quality"
                 }
             ]
         }

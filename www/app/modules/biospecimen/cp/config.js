@@ -164,6 +164,14 @@ angular.module('openspecimen')
       );
     }
 
+    function getBulkUpdateDictionary() {
+      return getWorkflowData(-1, 'bulk-update-dictionary', {}).then(
+        function(bud) {
+          return {cpId: -1, fields: bud.fields || []};
+        }
+      );
+    }
+
     return {
       getRegParticipantTmpl: function(cpId, cprId) {
         if (cprId != -1) { //edit case
@@ -217,6 +225,28 @@ angular.module('openspecimen')
                 return sysDict.fields || defValue || [];
               }
             );
+          }
+        );
+      },
+
+      getBulkUpdateDictionary: function(cpId) {
+        return getWorkflowData(cpId, 'dictionary', {}).then(
+          function(wfData) {
+            if (wfData.fields && wfData.fields.length > 0) {
+              return {cpId: cpId, fields: wfData.fields};
+            } else if (cpId == -1) {
+              return getBulkUpdateDictionary();
+            } else {
+              return getWorkflowData(-1, 'dictionary', {}).then(
+                function(sysWfData) {
+                  if (sysWfData.fields && sysWfData.fields.length > 0) {
+                    return {cpId: -1, fields: sysWfData.fields};
+                  } else {
+                    return getBulkUpdateDictionary();
+                  }
+                }
+              );
+            }
           }
         );
       },
@@ -283,6 +313,23 @@ angular.module('openspecimen')
             }
 
             return (data.participant || {})[src || 'OpenSpecimen'] || [];
+          }
+        );
+      },
+
+      getSpecimenTreeCfg: function(cpId) {
+        return getWorkflowData(-1, 'specimenTree', {}).then(
+          function(sysTreeCfg) {
+            var result = angular.extend({}, sysTreeCfg);
+            if (cpId == -1) {
+              return result;
+            }
+
+            return getWorkflowData(cpId, 'specimenTree', {}).then(
+              function(cpTreeCfg) {
+                return angular.extend(result, cpTreeCfg);
+              }
+            );
           }
         );
       },

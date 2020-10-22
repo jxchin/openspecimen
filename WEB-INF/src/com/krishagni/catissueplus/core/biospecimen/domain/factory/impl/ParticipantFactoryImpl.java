@@ -31,6 +31,7 @@ import com.krishagni.catissueplus.core.common.errors.ErrorType;
 import com.krishagni.catissueplus.core.common.errors.OpenSpecimenException;
 import com.krishagni.catissueplus.core.common.util.ConfigUtil;
 import com.krishagni.catissueplus.core.common.util.Status;
+import com.krishagni.catissueplus.core.common.util.Utility;
 import com.krishagni.catissueplus.core.de.domain.DeObject;
 
 
@@ -78,6 +79,7 @@ public class ParticipantFactoryImpl implements ParticipantFactory {
 		setUid(detail, participant, partial, ose);
 		setEmpi(detail, participant, partial, ose);
 		setName(detail, participant, partial, ose);
+		setEmailAddress(detail, participant, partial, ose);
 		setVitalStatus(detail, participant, partial, ose);
 		setBirthAndDeathDate(detail, participant, partial, ose);
 		setActivityStatus(detail, participant, partial, ose);
@@ -156,7 +158,17 @@ public class ParticipantFactoryImpl implements ParticipantFactory {
 		if (!partial || detail.isAttrModified("lastName")) {
 			participant.setLastName(detail.getLastName());
 		}		
-	}	
+	}
+
+	private void setEmailAddress(ParticipantDetail detail, Participant participant, boolean partial, OpenSpecimenException ose) {
+		if (!partial || detail.isAttrModified("emailAddress")) {
+			if (StringUtils.isNotBlank(detail.getEmailAddress()) && !Utility.isValidEmail(detail.getEmailAddress())) {
+				ose.addError(ParticipantErrorCode.INVALID_EMAIL_ID, detail.getEmailAddress());
+			}
+
+			participant.setEmailAddress(detail.getEmailAddress());
+		}
+	}
 
 	private void setVitalStatus(ParticipantDetail detail, Participant participant, boolean partial, OpenSpecimenException oce) {
 		if (partial && !detail.isAttrModified("vitalStatus")) {
@@ -178,7 +190,7 @@ public class ParticipantFactoryImpl implements ParticipantFactory {
 			participant.setBirthDate(birthDate);
 		}
 
-		if (!DEAD_STATUS.equals(participant.getVitalStatus())) {
+		if (participant.getVitalStatus() == null || !DEAD_STATUS.equals(participant.getVitalStatus().getValue())) {
 			participant.setDeathDate(null);
 		} else if (!partial || detail.isAttrModified("deathDate")) {
 			Date deathDate = detail.getDeathDate();
@@ -228,13 +240,8 @@ public class ParticipantFactoryImpl implements ParticipantFactory {
 		if (partial && !detail.isAttrModified("races")) {
 			return;
 		}
-		
-		Set<String> races = detail.getRaces();
-		if (races == null) {
-			return;
-		}
 
-		participant.setRaces(getPvs(RACE, races, ParticipantErrorCode.INVALID_RACE, oce));
+		participant.setRaces(getPvs(RACE, detail.getRaces(), ParticipantErrorCode.INVALID_RACE, oce));
 	}
 
 	private void setEthnicity(ParticipantDetail detail, Participant participant, boolean partial, OpenSpecimenException oce) {
@@ -242,12 +249,7 @@ public class ParticipantFactoryImpl implements ParticipantFactory {
 			return;
 		}
 		
-		Set<String> ethnicities = detail.getEthnicities();
-		if (ethnicities == null) {
-			return;
-		}
-
-		participant.setEthnicities(getPvs(ETHNICITY, ethnicities, ParticipantErrorCode.INVALID_ETHNICITY, oce));
+		participant.setEthnicities(getPvs(ETHNICITY, detail.getEthnicities(), ParticipantErrorCode.INVALID_ETHNICITY, oce));
 	}
 	
 	private void setPmi(

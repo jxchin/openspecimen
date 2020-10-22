@@ -3,8 +3,9 @@ package com.krishagni.catissueplus.core.common.util;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.Collection;
+import java.util.TimeZone;
 
-import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -13,9 +14,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.codec.Base64;
-import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 
 import com.krishagni.catissueplus.core.administrative.domain.Institute;
@@ -53,18 +54,23 @@ public class AuthUtil {
 	}
 	
 	public static String getRemoteAddr() {
-		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-		if (auth == null) {
+		UserAuthToken token = (UserAuthToken) SecurityContextHolder.getContext().getAuthentication();
+		if (token == null) {
 			return null;
 		}
-		
-		Object obj = auth.getDetails();
-		if (obj instanceof WebAuthenticationDetails) {
-			WebAuthenticationDetails details = (WebAuthenticationDetails)obj;
-			return details.getRemoteAddress();
+
+		return token.getIpAddress();
+	}
+
+	public static TimeZone getUserTimeZone() {
+		UserAuthToken token = (UserAuthToken) SecurityContextHolder.getContext().getAuthentication();
+		if (token == null) {
+			return null;
 		}
-		
-		return null;
+
+		User currUser = getCurrentUser();
+		String timeZone = currUser != null && currUser.getTimeZone() != null ? currUser.getTimeZone() : token.getTimeZone();
+		return toTimeZone(timeZone);
 	}
 
 	public static void setCurrentUser(User user) {
@@ -72,9 +78,11 @@ public class AuthUtil {
 	}
 
 	public static void setCurrentUser(User user, String authToken, HttpServletRequest httpReq) {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(user, authToken, user.getAuthorities());
+		UserAuthToken token = new UserAuthToken(user, authToken, user.getAuthorities());
 		if (httpReq != null) {
 			token.setDetails(new WebAuthenticationDetailsSource().buildDetails(httpReq));
+			token.setTimeZone(httpReq.getHeader("X-OS-CLIENT-TZ"));
+			token.setIpAddress(Utility.getRemoteAddress(httpReq));
 		}
 
 		SecurityContextHolder.getContext().setAuthentication(token);
@@ -93,6 +101,10 @@ public class AuthUtil {
 	}
 	
 	public static String encodeToken(String token) {
+		if (token == null) {
+			return null;
+		}
+
 		return new String(Base64.encode(token.getBytes()));
 	}
 	
@@ -105,16 +117,19 @@ public class AuthUtil {
 	}
 
 	public static void setTokenCookie(HttpServletRequest httpReq, HttpServletResponse httpResp, String authToken) {
-		Cookie cookie = new Cookie("osAuthToken", authToken);
-		cookie.setPath(getContextPath(httpReq));
-		cookie.setHttpOnly(true);
-		cookie.setSecure(httpReq.isSecure());
-
-		if (authToken == null) {
-			cookie.setMaxAge(0);
+		String cookieValue = "osAuthToken=" + (authToken != null ? authToken : "") + ";";
+		cookieValue += "Path=" + getContextPath(httpReq) + ";";
+		cookieValue += "HttpOnly;";
+		cookieValue += "SameSite=Strict;";
+		if (httpReq.isSecure()) {
+			cookieValue += "secure;";
 		}
 
-		httpResp.addCookie(cookie);
+		if (authToken == null) {
+			cookieValue += "Max-Age=0;";
+		}
+
+		httpResp.setHeader("Set-Cookie", cookieValue);
 	}
 
 	public static void clearTokenCookie(HttpServletRequest httpReq, HttpServletResponse httpResp) {
@@ -185,5 +200,49 @@ public class AuthUtil {
 		}
 
 		return value;
+	}
+
+	private static TimeZone toTimeZone(String timeZone) {
+		if (StringUtils.isBlank(timeZone)) {
+			return null;
+		}
+
+		try {
+			return TimeZone.getTimeZone(timeZone);
+		} catch (Exception e) {
+			logger.error("Error obtaining time zone information for: " + timeZone, e);
+		}
+
+		return null;
+	}
+
+	private static class UserAuthToken extends UsernamePasswordAuthenticationToken {
+		private String timeZone;
+
+		private String ipAddress;
+
+		public UserAuthToken(Object principal, Object credentials) {
+			super(principal, credentials);
+		}
+
+		public UserAuthToken(Object principal, Object credentials, Collection<? extends GrantedAuthority> authorities) {
+			super(principal, credentials, authorities);
+		}
+
+		public String getTimeZone() {
+			return timeZone;
+		}
+
+		public void setTimeZone(String timeZone) {
+			this.timeZone = timeZone;
+		}
+
+		public String getIpAddress() {
+			return ipAddress;
+		}
+
+		public void setIpAddress(String ipAddress) {
+			this.ipAddress = ipAddress;
+		}
 	}
 }

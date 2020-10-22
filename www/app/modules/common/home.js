@@ -208,6 +208,7 @@ angular.module('openspecimen')
         },
 
         {
+          showIf: {resource: 'Query', operations: ['Read']},
           sref: 'query-list',
           icon: 'fa fa-dashboard',
           title: 'menu.queries',
@@ -215,6 +216,7 @@ angular.module('openspecimen')
         },
 
         {
+          showIf: {resources: ['Specimen', 'PrimarySpecimen'], operations: ['Read']},
           sref: 'specimen-lists',
           icon: 'fa fa-shopping-cart',
           title: 'menu.specimen_lists',

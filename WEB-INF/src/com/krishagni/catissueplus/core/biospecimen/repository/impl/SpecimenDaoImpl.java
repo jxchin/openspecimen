@@ -46,7 +46,7 @@ public class SpecimenDaoImpl extends AbstractDao<Specimen> implements SpecimenDa
 		Criteria query = getCurrentSession().createCriteria(Specimen.class, "specimen")
 			.add(Subqueries.propertyIn("specimen.id", getSpecimenIdsQuery(crit)));
 
-		if (crit.specimenListId() != null) {
+		if (crit.lastId() == null && crit.specimenListId() != null) {
 			query.createAlias("specimen.specimenListItems", "listItem")
 				.createAlias("listItem.list", "list")
 				.add(Restrictions.eq("list.id", crit.specimenListId()))
@@ -449,6 +449,9 @@ public class SpecimenDaoImpl extends AbstractDao<Specimen> implements SpecimenDa
 		addSiteCpsCond(query, crit);
 		addCpCond(query, crit);
 		addPpidCond(query, crit);
+		addCprIdCond(query, crit);
+		addVisitIdCond(query, crit);
+		addAncestorId(query, crit);
 		addSpecimenListCond(query, crit);
 		addReservedForDpCond(query, crit);
 		addStorageLocationCond(query, crit);
@@ -526,6 +529,45 @@ public class SpecimenDaoImpl extends AbstractDao<Specimen> implements SpecimenDa
 		}
 
 		query.add(Restrictions.ilike("cpr.ppid", crit.ppid(), crit.matchMode()));
+	}
+
+	private void addCprIdCond(Criteria query, SpecimenListCriteria crit) {
+		if (crit.cprId() == null) {
+			return;
+		}
+
+		if (CollectionUtils.isEmpty(crit.siteCps()) && crit.cpId() == null && StringUtils.isBlank(crit.ppid())) {
+			if (!query.getAlias().equals("visit")) {
+				query.createAlias("specimen.visit", "visit");
+			}
+
+			query.createAlias("visit.registration", "cpr");
+		}
+
+		query.add(Restrictions.eq("cpr.id", crit.cprId()));
+	}
+
+	private void addVisitIdCond(Criteria query, SpecimenListCriteria crit) {
+		if (crit.visitId() == null) {
+			return;
+		}
+
+		if (CollectionUtils.isEmpty(crit.siteCps()) && crit.cpId() == null && StringUtils.isBlank(crit.ppid()) && crit.cprId() == null) {
+			if (!query.getAlias().equals("visit")) {
+				query.createAlias("specimen.visit", "visit");
+			}
+		}
+
+		query.add(Restrictions.eq("visit.id", crit.visitId()));
+	}
+
+	private void addAncestorId(Criteria query, SpecimenListCriteria crit) {
+		if (crit.ancestorId() == null) {
+			return;
+		}
+
+		String sql = String.format(GET_DESCENDENTS_SQL, crit.ancestorId());
+		query.add(Restrictions.sqlRestriction("{alias}.identifier in (" + sql + ")"));
 	}
 
 	private void addSpecimenListCond(Criteria query, SpecimenListCriteria crit) {
@@ -666,4 +708,7 @@ public class SpecimenDaoImpl extends AbstractDao<Specimen> implements SpecimenDa
 	private static final String GET_STORAGE_SITE = FQN + ".getStorageSite";
 
 	private static final String GET_ROOT_ID = FQN + ".getRootId";
+
+	private static final String GET_DESCENDENTS_SQL =
+		"select descendent_id from catissue_specimen_hierarchy where ancestor_id = %d and ancestor_id != descendent_id";
 }

@@ -1,7 +1,7 @@
 
 angular.module('os.biospecimen.participant.overview', ['os.biospecimen.models'])
   .controller('ParticipantOverviewCtrl', function(
-    $scope, $state, $stateParams, $injector, hasSde, hasFieldsFn,
+    $scope, $state, $stateParams, $injector, hasSde, hasDict, hasFieldsFn,
     storePhi, cpDict, visitsTab, cp, cpr, consents, visits,
     Visit, CollectSpecimensSvc, SpecimenLabelPrinter, ExtensionsUtil, Util, Alerts) {
 
@@ -10,7 +10,7 @@ angular.module('os.biospecimen.participant.overview', ['os.biospecimen.models'])
       $scope.anticipatedVisits = Visit.anticipatedVisits(visits);
       $scope.missedVisits      = Visit.missedVisits(visits);
 
-      ExtensionsUtil.createExtensionFieldMap($scope.cpr.participant);
+      ExtensionsUtil.createExtensionFieldMap($scope.cpr.participant, hasDict);
       $scope.partCtx = {
         obj: {cpr: $scope.cpr, consents: createCodedResps(consents)},
         inObjs: ['cpr', 'consents', 'calcCpr'],
@@ -43,7 +43,7 @@ angular.module('os.biospecimen.participant.overview', ['os.biospecimen.models'])
       if (!!field) {
         angular.forEach(inputVisits,
           function(iv) {
-            ExtensionsUtil.createExtensionFieldMap(iv);
+            ExtensionsUtil.createExtensionFieldMap(iv, hasDict);
           }
         );
       }
@@ -87,7 +87,7 @@ angular.module('os.biospecimen.participant.overview', ['os.biospecimen.models'])
             function(savedCpr) {
               $scope.cpr.participant = null;
               angular.extend($scope.cpr, savedCpr);
-              ExtensionsUtil.createExtensionFieldMap($scope.cpr.participant);
+              ExtensionsUtil.createExtensionFieldMap($scope.cpr.participant, hasDict);
               Alerts.success("participant.anonymized_successfully");
             }
           )
@@ -105,10 +105,13 @@ angular.module('os.biospecimen.participant.overview', ['os.biospecimen.models'])
       CollectSpecimensSvc.collectPending(retSt, cp, cpr.id, visit);
     }
 
-    $scope.printSpecimenLabels = function() {
+    $scope.printSpecimenLabels = function(args) {
+      args = args || {};
+      args = angular.extend(args, {cprId: cpr.id});
+
       var ts = Util.formatDate(Date.now(), 'yyyyMMdd_HHmmss');
       var outputFilename = [cpr.cpShortTitle, cpr.ppid, ts].join('_') + '.csv';
-      SpecimenLabelPrinter.printLabels({cprId: cpr.id}, outputFilename);
+      SpecimenLabelPrinter.printLabels(args, outputFilename);
     }
 
     init();

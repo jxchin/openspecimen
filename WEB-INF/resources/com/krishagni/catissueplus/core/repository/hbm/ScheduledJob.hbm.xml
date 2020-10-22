@@ -71,9 +71,16 @@
       <many-to-many class="com.krishagni.catissueplus.core.administrative.domain.User" column="USER_ID"/>
     </set>
 
+    <set name="sharedWith" table="OS_SCHEDULED_JOB_SHARED_USERS" cascade="none">
+      <key column="SCHEDULED_JOB_ID"/>
+      <many-to-many class="com.krishagni.catissueplus.core.administrative.domain.User" column="USER_ID"/>
+    </set>
+
     <property name="rtArgsProvided" column="RT_ARGS_PROVIDED"/>
     
     <property name="rtArgsHelpText" column="RT_ARGS_HELP_TEXT"/>
+
+    <property name="runByNode" column="RUN_BY_NODE"/>
 
     <filter name="activeEntity"/>
 
@@ -93,9 +100,28 @@
       from
         os_scheduled_job_runs
       where
-        scheduled_job_id in (:jobIds)
+        scheduled_job_id in (:jobIds) and
+        status in (:statuses)
       group by
         scheduled_job_id
+    </sql-query>
+
+    <sql-query name="getRunByNodeForUpdate">
+      <return-scalar column="identifier" type="long"/>
+      <return-scalar column="name" type="string"/>
+      <return-scalar column="node" type="string"/>
+
+      select
+        identifier, name, run_by_node as node
+      from
+        os_scheduled_jobs
+      where
+        identifier = :jobId
+      for update
+    </sql-query>
+
+    <sql-query name="updateRunByNode">
+      update os_scheduled_jobs set run_by_node = :nodeName where identifier = :jobId
     </sql-query>
   </class>
 </hibernate-mapping>

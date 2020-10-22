@@ -11,6 +11,13 @@ angular.module('os.administrative.shipment')
 
     function init() {
       $scope.ctx = ctx;
+      ctx.emptyState = {
+        empty: true,
+        loading: true,
+        emptyMessage: 'container.empty_list',
+        loadingMessage: 'container.loading_list'
+      };
+
       loadContainers(); 
       $scope.$watch('ctx.currPage', loadContainers);
     }
@@ -18,10 +25,13 @@ angular.module('os.administrative.shipment')
     function loadContainers() {
       var startAt     = (ctx.currPage - 1) * ctx.itemsPerPage;
       var maxResults  = ctx.itemsPerPage + 1;
-      ctx.loading = true;
-      shipment.getContainers(startAt, maxResults).then(
+      ctx.emptyState.loading = true;
+      shipment.getContainers(startAt, maxResults, ctx.orderBy, ctx.direction).then(
         function(shipmentContainers) {
           ctx.totalItems = (ctx.currPage - 1) * ctx.itemsPerPage + shipmentContainers.length;
+          ctx.emptyState.loading = false;
+          ctx.emptyState.empty = (ctx.totalItems <= 0);
+
           if (shipmentContainers.length >= maxResults) {
             shipmentContainers.splice(shipmentContainers.length - 1, 1);
           }
@@ -30,6 +40,17 @@ angular.module('os.administrative.shipment')
           ctx.loading = false;
         }
       );
+    }
+
+    $scope.sortBy = function(attr) {
+      if (ctx.orderBy == attr) {
+        ctx.direction = (ctx.direction == 'asc' ? 'desc' : 'asc');
+      } else {
+        ctx.orderBy = attr;
+        ctx.direction = 'asc';
+      }
+
+      loadContainers();
     }
 
     init();
